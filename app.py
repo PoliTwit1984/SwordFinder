@@ -4,6 +4,7 @@ import requests
 from flask import Flask, request, jsonify, render_template
 from datetime import datetime
 import traceback
+from bs4 import BeautifulSoup
 from swordfinder import SwordFinder
 
 # Configure logging
@@ -16,6 +17,62 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-prod
 
 # Initialize SwordFinder
 sword_finder = SwordFinder()
+
+def extract_mp4_from_sporty_page(play_id, video_type=None):
+    """
+    Extract the direct MP4 download URL from a Baseball Savant sporty-videos page
+    
+    Args:
+        play_id (str): The UUID playId for the pitch
+        video_type (str): Optional video type (HOME, AWAY, NETWORK)
+        
+    Returns:
+        str: Direct MP4 URL if found, None otherwise
+    """
+    try:
+        # Build the page URL
+        if video_type:
+            page_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}&videoType={video_type}"
+        else:
+            page_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
+        
+        logger.debug(f"Extracting MP4 from: {page_url}")
+        
+        # Load the page
+        response = requests.get(page_url, timeout=15)
+        response.raise_for_status()
+        
+        # Parse HTML with BeautifulSoup
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Find the video-box div and then the video tag
+        video_box = soup.find('div', class_='video-box')
+        if not video_box:
+            logger.warning(f"No video-box div found for playId {play_id}")
+            return None
+        
+        video_tag = video_box.find('video')
+        if not video_tag:
+            logger.warning(f"No video tag found in video-box for playId {play_id}")
+            return None
+        
+        # Find the MP4 source
+        mp4_source = video_tag.find('source', type='video/mp4')
+        if not mp4_source:
+            logger.warning(f"No MP4 source found for playId {play_id}")
+            return None
+        
+        mp4_url = mp4_source.get('src')
+        if mp4_url:
+            logger.info(f"Found MP4 URL for playId {play_id}: {mp4_url}")
+            return mp4_url
+        else:
+            logger.warning(f"MP4 source tag has no src attribute for playId {play_id}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error extracting MP4 from sporty page for playId {play_id}: {str(e)}")
+        return None
 
 def get_best_video_url(play_id):
     """
@@ -266,20 +323,42 @@ def get_play_id():
                         # Use the UUID if found, otherwise fall back to numeric
                         final_play_id = uuid_play_id if uuid_play_id else play_id
                         
-                        # Generate simple video URL
-                        video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={final_play_id}"
+                        # Get the best available video URL and type
+                        video_info = get_best_video_url(final_play_id)
                         
-                        return jsonify({
+                        response_data = {
                             "success": True,
                             "playId": final_play_id,
                             "numeric_id": play_id,
                             "uuid_id": uuid_play_id,
-                            "video_url": video_url,
                             "description": description,
                             "game_pk": game_pk,
                             "inning": inning,
                             "pitch_number": pitch_number
-                        })
+                        }
+                        
+                        if video_info:
+                            response_data.update({
+                                "video_type": video_info["video_type"],
+                                "video_url": video_info["video_url"]
+                            })
+                            
+                            # Extract the direct MP4 download URL
+                            download_url = extract_mp4_from_sporty_page(final_play_id, video_info["video_type"])
+                            response_data["download_url"] = download_url
+                        else:
+                            # Try without video type as fallback
+                            fallback_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={final_play_id}"
+                            download_url = extract_mp4_from_sporty_page(final_play_id)
+                            
+                            response_data.update({
+                                "video_type": None,
+                                "video_url": fallback_url,
+                                "download_url": download_url,
+                                "note": "Using fallback video URL"
+                            })
+                        
+                        return jsonify(response_data)
         
         # No matching pitch found
         logger.warning(f"No matching pitch found for game {game_pk}, inning {inning}, pitch {pitch_number}")
