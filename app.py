@@ -778,6 +778,106 @@ def run_patch_process():
         logger.error(f"Patch process failed: {e}")
         logger.error(traceback.format_exc())
 
+def run_csv_patch_process():
+    """CSV patch process with real-time monitoring"""
+    global patch_status
+    
+    try:
+        import psycopg2
+        
+        # Connect to database
+        database_url = os.environ.get('DATABASE_URL')
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        patch_status["current_processing"] = "Loading CSV file..."
+        
+        # Load CSV with all authentic MLB data
+        df = pd.read_csv('complete_statcast_2025.csv', low_memory=False)
+        patch_status["current_processing"] = f"Processing {len(df)} records from CSV..."
+        
+        # Prepare efficient update query
+        update_query = """
+        UPDATE statcast_pitches 
+        SET 
+            home_team = COALESCE(home_team, %s),
+            away_team = COALESCE(away_team, %s),
+            release_speed = COALESCE(release_speed, %s),
+            release_spin_rate = COALESCE(release_spin_rate, %s),
+            spin_axis = COALESCE(spin_axis, %s),
+            plate_x = COALESCE(plate_x, %s),
+            plate_z = COALESCE(plate_z, %s),
+            pitch_name = COALESCE(pitch_name, %s),
+            stand = COALESCE(stand, %s),
+            p_throws = COALESCE(p_throws, %s),
+            sz_top = COALESCE(sz_top, %s),
+            sz_bot = COALESCE(sz_bot, %s)
+        WHERE game_pk = %s 
+        AND game_date = %s
+        AND pitcher = %s
+        AND batter = %s
+        """
+        
+        batch_size = 1000
+        
+        for i in range(0, len(df), batch_size):
+            if patch_status["status"] != "Running":
+                break
+                
+            batch = df.iloc[i:i+batch_size]
+            batch_data = []
+            
+            for _, row in batch.iterrows():
+                # Skip if missing critical fields
+                if pd.isna(row.get('game_pk')) or pd.isna(row.get('game_date')):
+                    continue
+                    
+                def safe_value(val):
+                    return None if pd.isna(val) or val == '' else val
+                
+                update_data = (
+                    safe_value(row.get('home_team')),
+                    safe_value(row.get('away_team')),
+                    safe_value(row.get('release_speed')),
+                    safe_value(row.get('release_spin_rate')),
+                    safe_value(row.get('spin_axis')),
+                    safe_value(row.get('plate_x')),
+                    safe_value(row.get('plate_z')),
+                    safe_value(row.get('pitch_name')),
+                    safe_value(row.get('stand')),
+                    safe_value(row.get('p_throws')),
+                    safe_value(row.get('sz_top')),
+                    safe_value(row.get('sz_bot')),
+                    # WHERE conditions
+                    int(row.get('game_pk')) if not pd.isna(row.get('game_pk')) else None,
+                    str(row.get('game_date')) if not pd.isna(row.get('game_date')) else None,
+                    int(row.get('pitcher')) if not pd.isna(row.get('pitcher')) else None,
+                    int(row.get('batter')) if not pd.isna(row.get('batter')) else None
+                )
+                batch_data.append(update_data)
+            
+            # Execute batch update
+            if batch_data:
+                cursor.executemany(update_query, batch_data)
+                patch_status["rows_updated"] += cursor.rowcount
+                conn.commit()
+            
+            # Update monitoring status
+            patch_status["rows_scanned"] = min(i + batch_size, len(df))
+            patch_status["elapsed_time"] = time_module.time() - patch_status["start_time"]
+            patch_status["current_processing"] = f"Batch {i//batch_size + 1}: Updated {patch_status['rows_updated']} records"
+        
+        cursor.close()
+        conn.close()
+        
+        patch_status["status"] = "Completed"
+        patch_status["current_processing"] = f"CSV patch completed! Updated {patch_status['rows_updated']} records with authentic MLB data"
+        
+    except Exception as e:
+        patch_status["status"] = "Error"
+        patch_status["error_message"] = str(e)
+        patch_status["current_processing"] = f"Error: {str(e)}"
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
