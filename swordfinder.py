@@ -220,15 +220,17 @@ class SwordFinder:
                 for idx, swing in game_swings.iterrows():
                     inning = swing['inning']
                     pitch_number = swing['pitch_number']
+                    at_bat_number = swing.get('at_bat_number')
+                    batter_id = swing.get('batter')
                     
-                    # Search for matching pitch in game data
-                    play_id = self._find_play_id_for_pitch(all_plays, inning, pitch_number)
+                    # Search for matching pitch in game data with more specific criteria
+                    play_id = self._find_play_id_for_pitch(all_plays, inning, pitch_number, at_bat_number, batter_id)
                     
                     if play_id:
                         data_with_playids.loc[idx, 'play_id'] = play_id
-                        logger.debug(f"Found playId {play_id} for game {game_pk}, inning {inning}, pitch {pitch_number}")
+                        logger.debug(f"Found playId {play_id} for game {game_pk}, inning {inning}, pitch {pitch_number}, at-bat {at_bat_number}")
                     else:
-                        logger.warning(f"No playId found for game {game_pk}, inning {inning}, pitch {pitch_number}")
+                        logger.warning(f"No playId found for game {game_pk}, inning {inning}, pitch {pitch_number}, at-bat {at_bat_number}")
                         
             except Exception as e:
                 logger.warning(f"Failed to fetch playIds for game {game_pk}: {str(e)}")
@@ -236,9 +238,10 @@ class SwordFinder:
         
         return data_with_playids
     
-    def _find_play_id_for_pitch(self, all_plays, target_inning, target_pitch_number):
+    def _find_play_id_for_pitch(self, all_plays, target_inning, target_pitch_number, target_at_bat_number=None, target_batter_id=None):
         """
         Find the playId for a specific pitch within game play data
+        Uses multiple criteria for precise matching
         """
         for play in all_plays:
             play_about = play.get('about', {})
@@ -246,6 +249,19 @@ class SwordFinder:
             
             # Only check plays from the target inning
             if play_inning == target_inning:
+                # If we have at-bat number, use it for additional matching
+                if target_at_bat_number:
+                    play_at_bat_index = play_about.get('atBatIndex')
+                    if play_at_bat_index is not None and (play_at_bat_index + 1) != target_at_bat_number:
+                        continue
+                
+                # If we have batter ID, check if it matches
+                if target_batter_id:
+                    matchup = play.get('matchup', {})
+                    batter_info = matchup.get('batter', {})
+                    if batter_info.get('id') != target_batter_id:
+                        continue
+                
                 play_events = play.get('playEvents', [])
                 
                 for event in play_events:
