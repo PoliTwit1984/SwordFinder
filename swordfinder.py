@@ -4,6 +4,7 @@ import numpy as np
 import requests
 from datetime import datetime
 import traceback
+from percentile_analyzer import PercentileAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,14 @@ class SwordFinder:
         self.weight_swing_tilt = 0.25
         self.weight_intercept_y = 0.25
         self.weight_zone_penalty = 0.15
+        
+        # Initialize percentile analyzer
+        try:
+            self.percentile_analyzer = PercentileAnalyzer()
+            logger.info("Percentile analyzer loaded successfully")
+        except Exception as e:
+            logger.warning(f"Could not load percentile analyzer: {e}")
+            self.percentile_analyzer = None
         
     def find_sword_swings(self, date_str):
         """
@@ -371,6 +380,53 @@ class SwordFinder:
                 "download_url": download_url,
                 "sword_score": round(float(row['sword_score']), 1)
             }
+            
+            # Add percentile analysis if available
+            if self.percentile_analyzer:
+                try:
+                    # Create pitch data dictionary for analysis
+                    pitch_data = {
+                        'pitch_type': result['pitch_type'],
+                        'pitch_name': result['pitch_name'],
+                        'release_speed': result['release_speed'],
+                        'release_spin_rate': result['release_spin_rate'],
+                        'pfx_x': round(float(row['pfx_x']), 2) if pd.notna(row.get('pfx_x')) else None,
+                        'pfx_z': round(float(row['pfx_z']), 2) if pd.notna(row.get('pfx_z')) else None,
+                        'release_extension': round(float(row['release_extension']), 1) if pd.notna(row.get('release_extension')) else None,
+                        'effective_speed': round(float(row['effective_speed']), 1) if pd.notna(row.get('effective_speed')) else None
+                    }
+                    
+                    # Get percentile analysis
+                    percentile_analysis = self.percentile_analyzer.analyze_pitch_percentiles(pitch_data)
+                    result['percentile_analysis'] = percentile_analysis
+                    
+                    # Add percentile highlights
+                    if percentile_analysis.get('percentiles'):
+                        highlights = []
+                        elite_metrics = []
+                        
+                        for metric_name, data in percentile_analysis['percentiles'].items():
+                            percentile = data['percentile']
+                            description = self.percentile_analyzer.get_percentile_description(percentile)
+                            
+                            if percentile >= 95:
+                                elite_metrics.append(f"Elite {metric_name}")
+                                highlights.append(f"Elite {metric_name} ({percentile}th percentile)")
+                            elif percentile >= 90:
+                                highlights.append(f"Excellent {metric_name} ({percentile}th percentile)")
+                            elif percentile <= 10:
+                                highlights.append(f"Poor {metric_name} ({percentile}th percentile)")
+                        
+                        result['percentile_highlights'] = highlights
+                        result['elite_metrics'] = elite_metrics
+                        
+                        # Add a summary of what made this pitch special
+                        if elite_metrics:
+                            result['what_made_it_special'] = f"This {result['pitch_name'].lower()} had {', '.join(elite_metrics).lower()}, making it exceptionally deceptive"
+                        
+                except Exception as e:
+                    logger.warning(f"Error adding percentile analysis: {e}")
+                    result['percentile_analysis'] = None
             results.append(result)
         
         return results
