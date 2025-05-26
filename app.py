@@ -5,9 +5,8 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for
 from datetime import datetime
 import traceback
 from bs4 import BeautifulSoup
-from swordfinder import SwordFinder
-from db_swordfinder import DatabaseSwordFinder
-from models import create_tables
+from simple_db_swordfinder import SimpleDatabaseSwordFinder
+from models_complete import create_tables
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -20,9 +19,8 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-prod
 # Initialize database tables
 create_tables()
 
-# Initialize both sword finders
-sword_finder = SwordFinder()  # Keep for fallback
-db_sword_finder = DatabaseSwordFinder()  # New database-powered version
+# Initialize database-powered sword finder with your authentic MLB data
+db_sword_finder = SimpleDatabaseSwordFinder()  # Uses your 226,833 authentic records
 
 @app.before_request
 def force_https():
@@ -192,9 +190,9 @@ def find_swords():
         
         logger.info(f"Processing sword swing analysis for date: {date_str}")
         
-        # Use original memory-based version that was working
-        sword_finder = SwordFinder()
-        sword_swings = sword_finder.find_sword_swings(date_str)
+        # Use database-powered version with complete authentic MLB data
+        result = db_sword_finder.find_sword_swings(date_str)
+        sword_swings = result.get('data', [])
         
         return jsonify({
             "success": True,

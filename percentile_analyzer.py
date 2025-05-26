@@ -1,22 +1,41 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional, List
+from models_complete import get_db, StatcastPitch
+from sqlalchemy import text
 
 class PercentileAnalyzer:
     """
-    Analyzes pitch percentiles based on the full 2025 Statcast dataset
+    Analyzes pitch percentiles based on the complete authentic MLB dataset
     """
     
-    def __init__(self, csv_path: str = 'attached_assets/statcast_2025.csv'):
+    def __init__(self):
         """
-        Initialize with the Statcast dataset
+        Initialize with the complete authentic MLB database
+        """
+        print("Loading complete authentic MLB dataset from database...")
         
-        Args:
-            csv_path (str): Path to the Statcast CSV file
-        """
-        print("Loading Statcast dataset...")
-        self.data = pd.read_csv(csv_path)
-        print(f"Loaded {len(self.data):,} pitch records")
+        # Load essential columns from your 226,833 authentic records
+        with get_db() as db:
+            query = text("""
+                SELECT bat_speed, swing_path_tilt, attack_angle, 
+                       intercept_ball_minus_batter_pos_y_inches, pitch_type,
+                       release_speed, launch_speed, launch_angle
+                FROM statcast_pitches 
+                WHERE bat_speed IS NOT NULL 
+                AND swing_path_tilt IS NOT NULL
+            """)
+            
+            result = db.execute(query)
+            rows = result.fetchall()
+            
+            # Convert to DataFrame
+            self.data = pd.DataFrame(rows, columns=[
+                'bat_speed', 'swing_path_tilt', 'attack_angle',
+                'intercept_ball_minus_batter_pos_y_inches', 'pitch_type',
+                'release_speed', 'launch_speed', 'launch_angle'
+            ])
+        print(f"Loaded {len(self.data):,} authentic MLB pitch records with complete sword metrics")
         
         # Cache percentile data for faster lookups
         self._percentile_cache = {}

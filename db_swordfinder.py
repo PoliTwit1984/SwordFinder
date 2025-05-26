@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import and_, desc
-from models import StatcastPitch, SwordSwing, DailyResults, SessionLocal, create_tables
+from models_complete import StatcastPitch, SwordSwing, DailyResults, get_db, create_tables
 from percentile_analyzer import PercentileAnalyzer
 import json
 
@@ -36,7 +36,7 @@ class DatabaseSwordFinder:
         logger.info(f"Finding sword swings for {date_str}")
         
         # Check if we already have results for this date
-        db = SessionLocal()
+        db = get_db()
         try:
             daily_result = db.query(DailyResults).filter(DailyResults.date == date_str).first()
             
