@@ -21,7 +21,10 @@ sword_finder = SwordFinder()
 @app.before_request
 def force_https():
     """Redirect all HTTP traffic to HTTPS"""
-    if request.headers.get('X-Forwarded-Proto', 'http') == 'http' and not app.debug:
+    if (request.headers.get('X-Forwarded-Proto', 'http') == 'http' and 
+        not app.debug and 
+        'localhost' not in request.host and 
+        '127.0.0.1' not in request.host):
         return redirect(request.url.replace('http://', 'https://'), code=301)
 
 def get_video_url_from_sporty_page(play_id, max_retries=3):
