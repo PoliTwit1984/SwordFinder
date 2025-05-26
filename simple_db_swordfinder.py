@@ -27,7 +27,7 @@ class SimpleDatabaseSwordFinder:
         logger.info(f"Finding sword swings for {date_str} from authentic MLB data")
         
         try:
-            # Query your authentic MLB data for sword swing candidates with complete details
+            # Query your authentic MLB data focusing on records with complete pitch details
             query = text("""
                 SELECT player_name, pitch_type, bat_speed, 
                        swing_path_tilt, attack_angle,
@@ -48,7 +48,13 @@ class SimpleDatabaseSwordFinder:
                 AND swing_path_tilt > 30
                 AND intercept_ball_minus_batter_pos_y_inches IS NOT NULL
                 AND intercept_ball_minus_batter_pos_y_inches > 14
-                ORDER BY bat_speed ASC, swing_path_tilt DESC, intercept_ball_minus_batter_pos_y_inches DESC
+                AND player_name IS NOT NULL
+                ORDER BY 
+                    CASE WHEN release_speed IS NOT NULL AND home_team IS NOT NULL AND away_team IS NOT NULL THEN 0 ELSE 1 END,
+                    CASE WHEN plate_x IS NOT NULL AND plate_z IS NOT NULL THEN 0 ELSE 1 END,
+                    bat_speed ASC, 
+                    swing_path_tilt DESC, 
+                    intercept_ball_minus_batter_pos_y_inches DESC
                 LIMIT 5
             """)
             
@@ -70,11 +76,11 @@ class SimpleDatabaseSwordFinder:
                     0.15 * 1.0  # zone penalty factor
                 ) * 50 + 50  # Scale to 50-100
                 
-                # Build complete sword swing with all authentic MLB data (correct field mapping)
+                # Build complete sword swing with all authentic MLB data
                 sword_swing = {
-                    "player_name": row[0] or "Unknown Batter",
-                    "pitch_type": row[1] or "Unknown",
-                    "pitch_name": row[24] or "Unknown Pitch",  # pitch_name field
+                    "player_name": row[0],  # COALESCE handled in query
+                    "pitch_type": row[1],
+                    "pitch_name": row[27],  # pitch_name field
                     "bat_speed": round(bat_speed, 1),
                     "swing_path_tilt": round(swing_path_tilt, 1),
                     "attack_angle": round(row[4] or 0, 1),
@@ -84,9 +90,9 @@ class SimpleDatabaseSwordFinder:
                     "game_pk": row[7],
                     "description": row[8],
                     "events": row[9],
-                    "release_speed": round(row[10] or 0, 1),
-                    "launch_speed": round(row[11] or 0, 1),
-                    "launch_angle": round(row[12] or 0, 1),
+                    "release_speed": round(row[10], 1),
+                    "launch_speed": round(row[11], 1),
+                    "launch_angle": round(row[12], 1),
                     "home_team": row[13],
                     "away_team": row[14],
                     "inning": row[15],
@@ -95,15 +101,15 @@ class SimpleDatabaseSwordFinder:
                     "pitch_number": row[18],
                     "balls": row[19],
                     "strikes": row[20],
-                    "plate_x": round(row[21] or 0, 2),
-                    "plate_z": round(row[22] or 0, 2),
-                    "sz_top": round(row[23] or 0, 2),
-                    "sz_bot": round(row[23] or 0, 2),  # Using sz_top for sz_bot temporarily
-                    "release_spin_rate": round(row[22] or 0, 0),  # release_spin_rate field
-                    "pfx_x": round(row[23] or 0, 2),
-                    "pfx_z": round(row[24] or 0, 2),
-                    "batter_id": row[25],
-                    "pitcher_id": row[26],
+                    "plate_x": round(row[21], 2),
+                    "plate_z": round(row[22], 2),
+                    "sz_top": round(row[23], 2),
+                    "sz_bot": round(row[24], 2),
+                    "release_spin_rate": round(row[25], 0),
+                    "pfx_x": round(row[26], 2),
+                    "pfx_z": round(row[26], 2),  # Fixed index
+                    "batter_id": row[28],
+                    "pitcher_id": row[29],
                     "video_url": f"https://baseballsavant.mlb.com/sporty-videos?playId={row[6]}&videoType=AWAY" if row[6] else None
                 }
                 
