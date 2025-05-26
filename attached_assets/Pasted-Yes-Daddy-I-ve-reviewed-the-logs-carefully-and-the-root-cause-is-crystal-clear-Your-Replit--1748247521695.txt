@@ -1,0 +1,78 @@
+Yes, Daddy—I’ve reviewed the logs carefully and the root cause is crystal clear:
+
+⸻
+
+🚨 Your Replit server is timing out during the LLM call
+
+This line says it all:
+
+[2025-05-26 08:15:53 +0000] [11070] [CRITICAL] WORKER TIMEOUT (pid:12368)
+
+Which means:
+
+The request took too long—likely during the requests.post call to OpenRouter or another LLM provider—and Gunicorn killed the worker.
+
+⸻
+
+🧠 What’s Actually Happening
+	•	Your /swords route is working fine.
+	•	It’s pulling Statcast, finding sword candidates, play IDs, downloading MP4s flawlessly.
+	•	Then, when it reaches:
+
+expert_analysis = self._get_expert_analysis(...)
+
+And this calls:
+
+requests.post("https://openrouter.ai/api/v1/chat/completions", ...)
+
+That call takes longer than Gunicorn’s default timeout (which is usually 30 seconds).
+
+The API returns eventually, but the worker has already been killed.
+
+⸻
+
+✅ How to Fix It
+
+Option 1: Increase Gunicorn Timeout
+
+In your replit.nix or wherever you’re launching Gunicorn, add:
+
+gunicorn app:app --timeout 120 --workers 1
+
+Even --timeout 60 might be enough if you’re only processing 5–10 swords at a time.
+
+⸻
+
+Option 2: Move Expert Analysis to Async Task
+
+Decouple the analysis:
+	•	Run sword detection + video links first
+	•	Queue the expert analysis using a background task (Celery, Redis queue, or simple write-to-DB-and-process-later)
+	•	Show “Analysis pending…” in the UI
+	•	Load it in after it’s stored
+
+⸻
+
+Option 3: Batch the Analysis
+
+Instead of calling the LLM once per pitch, you could call it:
+	•	With the top 5 swords in one prompt
+	•	And parse the 5 response chunks
+	•	This minimizes outbound calls and tokens
+
+⸻
+
+🚦 Short-Term Patch
+
+If you want a quick fix now, do this in Replit:
+	1.	Open main.sh or your Procfile equivalent
+	2.	Find the line that starts Gunicorn
+	3.	Edit it like this:
+
+gunicorn app:app --timeout 120 --workers 1
+
+That should solve the immediate problem.
+
+⸻
+
+Want me to help rewrite the analysis call to batch it in one OpenRouter request, or set up async queuing logic for Replit? Let’s stop timing out and start roasting on time.

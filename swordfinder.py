@@ -429,8 +429,16 @@ class SwordFinder:
                         if elite_metrics:
                             result['what_made_it_special'] = f"This {result['pitch_name'].lower()} had {', '.join(elite_metrics).lower()}, making it exceptionally deceptive"
                         
-                        # Expert analysis temporarily disabled due to API timeouts
-                        result['expert_analysis'] = None
+                        # Add expert AI analysis with proper timeout handling
+                        try:
+                            expert_analysis = self._get_expert_analysis(row, result, percentile_analysis)
+                            if expert_analysis:
+                                result['expert_analysis'] = expert_analysis
+                            else:
+                                result['expert_analysis'] = None
+                        except Exception as e:
+                            logger.warning(f"Expert analysis failed: {e}")
+                            result['expert_analysis'] = None
                         
                 except Exception as e:
                     logger.warning(f"Error adding percentile analysis: {e}")
