@@ -37,7 +37,7 @@
 
                         <h5>Complete Request Example</h5>
                         <div class="code-block mb-3">
-                            <strong>URL:</strong> <code>https://swordfinder.replit.app/swords</code><br>
+                            <strong>URL:</strong> <code>https://swordfinder.com/swords</code><br>
                             <strong>Method:</strong> <code>POST</code><br>
                             <strong>Headers:</strong> <code>Content-Type: application/json</code><br>
                             <strong>Body:</strong> <code>{"date": "2025-05-24"}</code>
@@ -115,16 +115,16 @@
                     <div class="card-body">
                         <h5>Production Endpoint</h5>
                         <div class="code-block mb-3">
-                            <code>https://swordfinder.replit.app/swords</code>
+                            <code>https://swordfinder.com/swords</code>
                         </div>
 
                         <h5>Example cURL Request</h5>
-                        <pre class="code-block"><code>curl -X POST https://swordfinder.replit.app/swords \
+                        <pre class="code-block"><code>curl -X POST https://swordfinder.com/swords \
   -H "Content-Type: application/json" \
   -d '{"date": "2025-05-24"}'</code></pre>
 
                         <h5>Example JavaScript Request</h5>
-                        <pre class="code-block"><code>const response = await fetch('https://swordfinder.replit.app/swords', {
+                        <pre class="code-block"><code>const response = await fetch('https://swordfinder.com/swords', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -141,7 +141,7 @@ console.log(data);</code></pre>
                         <pre class="code-block"><code>import requests
 
 response = requests.post(
-    'https://swordfinder.replit.app/swords',
+    'https://swordfinder.com/swords',
     json={'date': '2025-05-24'}
 )
 
