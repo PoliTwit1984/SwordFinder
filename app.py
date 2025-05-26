@@ -266,34 +266,20 @@ def get_play_id():
                         # Use the UUID if found, otherwise fall back to numeric
                         final_play_id = uuid_play_id if uuid_play_id else play_id
                         
-                        # Get the best available video URL
-                        video_info = get_best_video_url(final_play_id)
+                        # Generate simple video URL
+                        video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={final_play_id}"
                         
-                        response_data = {
+                        return jsonify({
                             "success": True,
                             "playId": final_play_id,
                             "numeric_id": play_id,
                             "uuid_id": uuid_play_id,
+                            "video_url": video_url,
                             "description": description,
                             "game_pk": game_pk,
                             "inning": inning,
                             "pitch_number": pitch_number
-                        }
-                        
-                        # Add video information if available
-                        if video_info:
-                            response_data.update({
-                                "video_url": video_info["video_url"],
-                                "video_type": video_info["video_type"]
-                            })
-                        else:
-                            response_data.update({
-                                "video_url": None,
-                                "video_type": None,
-                                "note": "No working video found for this pitch"
-                            })
-                        
-                        return jsonify(response_data)
+                        })
         
         # No matching pitch found
         logger.warning(f"No matching pitch found for game {game_pk}, inning {inning}, pitch {pitch_number}")

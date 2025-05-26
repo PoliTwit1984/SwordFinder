@@ -273,7 +273,7 @@ class SwordFinder:
         
         for _, row in data.iterrows():
             play_id = self._safe_get(row, 'play_id', '')
-            video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}&videoType=AWAY" if play_id else ""
+            video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}" if play_id else ""
             
             result = {
                 "player_name": self._safe_get(row, 'player_name', 'Unknown Player'),
