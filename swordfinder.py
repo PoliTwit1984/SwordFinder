@@ -236,7 +236,10 @@ class SwordFinder:
                 logger.warning(f"Failed to fetch playIds for game {game_pk}: {str(e)}")
                 continue
         
-        return data_with_playids
+        # Add batter names
+        data_with_names = self._add_batter_names(data_with_playids)
+        
+        return data_with_names
     
     def _find_play_id_for_pitch(self, all_plays, target_inning, target_pitch_number, target_at_bat_number=None, target_batter_id=None):
         """
@@ -281,6 +284,47 @@ class SwordFinder:
         
         return None
     
+    def _add_batter_names(self, data):
+        """
+        Add batter names by looking up batter IDs via MLB Stats API
+        """
+        if data.empty:
+            return data
+        
+        # Get unique batter IDs
+        unique_batter_ids = data['batter'].dropna().unique()
+        batter_name_cache = {}
+        
+        # Fetch batter names from MLB Stats API
+        for batter_id in unique_batter_ids:
+            try:
+                batter_id = int(batter_id)
+                url = f"https://statsapi.mlb.com/api/v1/people/{batter_id}"
+                response = requests.get(url, timeout=10)
+                
+                if response.status_code == 200:
+                    player_data = response.json()
+                    people = player_data.get('people', [])
+                    if people:
+                        full_name = people[0].get('fullName', 'Unknown Batter')
+                        batter_name_cache[batter_id] = full_name
+                        logger.debug(f"Found batter name: {full_name} for ID {batter_id}")
+                    else:
+                        batter_name_cache[batter_id] = 'Unknown Batter'
+                else:
+                    logger.warning(f"Failed to fetch batter info for ID {batter_id}: {response.status_code}")
+                    batter_name_cache[batter_id] = 'Unknown Batter'
+                    
+            except Exception as e:
+                logger.warning(f"Error fetching batter name for ID {batter_id}: {str(e)}")
+                batter_name_cache[batter_id] = 'Unknown Batter'
+        
+        # Add batter names to dataframe
+        data_copy = data.copy()
+        data_copy['batter_name'] = data_copy['batter'].map(lambda x: batter_name_cache.get(int(x) if pd.notna(x) else None, 'Unknown Batter'))
+        
+        return data_copy
+    
     def _format_results(self, data):
         """
         Format the results for JSON response
@@ -299,6 +343,7 @@ class SwordFinder:
                 "game_pk": int(row['game_pk']) if pd.notna(row.get('game_pk')) else None,
                 "player_name": self._safe_get(row, 'player_name', 'Unknown Player'),
                 "pitcher_name": self._safe_get(row, 'player_name', 'Unknown Pitcher'),
+                "batter_name": self._safe_get(row, 'batter_name', 'Unknown Batter'),
                 "pitch_type": self._safe_get(row, 'pitch_type', 'Unknown'),
                 "pitch_name": self._get_pitch_name(self._safe_get(row, 'pitch_type', 'Unknown')),
                 "release_speed": round(float(row['release_speed']), 1) if pd.notna(row.get('release_speed')) else None,
