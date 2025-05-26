@@ -98,6 +98,8 @@
                     <div class="card-body">
                         <pre class="code-block"><code>{
   "success": true,
+  "count": 5,
+  "date": "2025-05-24",
   "data": [
     {
       "player_name": "Herrin, Tim",
@@ -122,10 +124,44 @@
       "game_pk": 777789,
       "inning": 3,
       "pitch_number": 2
+    },
+    {
+      "player_name": "Helsley, Ryan",
+      "pitch_type": "SL",
+      "bat_speed": 43.5,
+      "intercept_y": 39.9,
+      "swing_path_tilt": 43.8,
+      "sword_score": 97.6,
+      "play_id": "",
+      "game_pk": 777786,
+      "inning": 9,
+      "pitch_number": 5
+    },
+    {
+      "player_name": "Valdez, Framber",
+      "pitch_type": "CU",
+      "bat_speed": 29.9,
+      "intercept_y": 34.1,
+      "swing_path_tilt": 31.3,
+      "sword_score": 97.3,
+      "play_id": "",
+      "game_pk": 777787,
+      "inning": 3,
+      "pitch_number": 3
+    },
+    {
+      "player_name": "Matthews, Zebby",
+      "pitch_type": "SL",
+      "bat_speed": 26.2,
+      "intercept_y": 19.0,
+      "swing_path_tilt": 44.0,
+      "sword_score": 97.2,
+      "play_id": "",
+      "game_pk": 777788,
+      "inning": 2,
+      "pitch_number": 4
     }
-  ],
-  "count": 5,
-  "date": "2025-05-24"
+  ]
 }</code></pre>
                     </div>
                 </div>
@@ -166,6 +202,7 @@
                 
                 if (data.success) {
                     displayResults(data);
+                    updateExampleResponse(data);
                 } else {
                     showError(data.error || 'Unknown error occurred');
                 }
@@ -241,6 +278,13 @@
             
             errorMessage.textContent = message;
             errorAlert.style.display = 'block';
+        }
+        
+        function updateExampleResponse(data) {
+            const exampleResponseElement = document.querySelector('.code-block code');
+            if (exampleResponseElement) {
+                exampleResponseElement.textContent = JSON.stringify(data, null, 2);
+            }
         }
         
         // Set default date to yesterday
