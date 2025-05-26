@@ -1,7 +1,7 @@
 import os
 import logging
 import requests
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from datetime import datetime
 import traceback
 from bs4 import BeautifulSoup
@@ -17,6 +17,12 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-prod
 
 # Initialize SwordFinder
 sword_finder = SwordFinder()
+
+@app.before_request
+def force_https():
+    """Redirect all HTTP traffic to HTTPS"""
+    if request.headers.get('X-Forwarded-Proto', 'http') == 'http' and not app.debug:
+        return redirect(request.url.replace('http://', 'https://'), code=301)
 
 def get_video_url_from_sporty_page(play_id, max_retries=3):
     """
@@ -103,9 +109,14 @@ def get_best_video_url(play_id):
     return None
 
 @app.route('/')
-def index():
-    """Serve the documentation and testing interface"""
-    return render_template('index.html')
+def home():
+    """Serve the main SwordFinder application"""
+    return render_template('home.html')
+
+@app.route('/docs')
+def docs():
+    """Serve the API documentation and testing interface"""
+    return render_template('docs.html')
 
 @app.route('/swords', methods=['POST'])
 def find_swords():
