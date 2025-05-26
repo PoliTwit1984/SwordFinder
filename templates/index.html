@@ -83,7 +83,7 @@
                         </div>
 
                         <!-- Raw JSON Button (shows after results) -->
-                        <div id="rawJsonButtonContainer" class="mt-3" style="display: none;">
+                        <div id="rawJsonButtonContainer" class="mt-3" style="display: block;">
                             <button type="button" class="btn btn-outline-secondary" id="viewRawJsonBtn" onclick="showRawJsonModal()">
                                 <i class="fas fa-code me-2"></i>View Raw JSON
                             </button>
@@ -215,6 +215,12 @@
             results.style.display = 'none';
             errorAlert.style.display = 'none';
             analyzeBtn.disabled = true;
+            
+            // Hide the Raw JSON button
+            const rawJsonButtonContainer = document.getElementById('rawJsonButtonContainer');
+            if (rawJsonButtonContainer) {
+                rawJsonButtonContainer.style.display = 'none';
+            }
             
             try {
                 const response = await fetch('/swords', {
