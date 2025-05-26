@@ -49,6 +49,9 @@ complete_statcast_2025.csv
 full_statcast_*.csv
 swords_chunk*.csv
 test_authentic_data.csv
+attached_assets/*.csv
+attached_assets/full_statcast_*.csv
+attached_assets/statcast_*.csv
 
 # Video files (downloaded MP4s)
 static/videos/
