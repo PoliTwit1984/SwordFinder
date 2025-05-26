@@ -18,61 +18,53 @@ app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-prod
 # Initialize SwordFinder
 sword_finder = SwordFinder()
 
-def extract_mp4_from_sporty_page(play_id, video_type=None):
+def get_video_url_from_sporty_page(play_id, max_retries=3):
     """
     Extract the direct MP4 download URL from a Baseball Savant sporty-videos page
+    Based on proven solution from GitHub
     
     Args:
         play_id (str): The UUID playId for the pitch
-        video_type (str): Optional video type (HOME, AWAY, NETWORK)
+        max_retries (int): Number of retry attempts
         
     Returns:
         str: Direct MP4 URL if found, None otherwise
     """
-    try:
-        # Build the page URL
-        if video_type:
-            page_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}&videoType={video_type}"
-        else:
+    attempt = 0
+    while attempt < max_retries:
+        try:
             page_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
-        
-        logger.debug(f"Extracting MP4 from: {page_url}")
-        
-        # Load the page
-        response = requests.get(page_url, timeout=15)
-        response.raise_for_status()
-        
-        # Parse HTML with BeautifulSoup
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Find the video-box div and then the video tag
-        video_box = soup.find('div', class_='video-box')
-        if not video_box:
-            logger.warning(f"No video-box div found for playId {play_id}")
-            return None
-        
-        video_tag = video_box.find('video')
-        if not video_tag:
-            logger.warning(f"No video tag found in video-box for playId {play_id}")
-            return None
-        
-        # Find the MP4 source
-        mp4_source = video_tag.find('source', type='video/mp4')
-        if not mp4_source:
-            logger.warning(f"No MP4 source found for playId {play_id}")
-            return None
-        
-        mp4_url = mp4_source.get('src')
-        if mp4_url:
-            logger.info(f"Found MP4 URL for playId {play_id}: {mp4_url}")
-            return mp4_url
-        else:
-            logger.warning(f"MP4 source tag has no src attribute for playId {play_id}")
-            return None
+            logger.debug(f"Extracting MP4 from: {page_url} (attempt {attempt + 1})")
             
-    except Exception as e:
-        logger.error(f"Error extracting MP4 from sporty page for playId {play_id}: {str(e)}")
-        return None
+            response = requests.get(page_url, timeout=15)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            video_container = soup.find('div', class_='video-box')
+            
+            if video_container:
+                video_tag = video_container.find('video')
+                if video_tag:
+                    source_tag = video_tag.find('source', {'type': 'video/mp4'})
+                    if source_tag and source_tag.get('src'):
+                        mp4_url = source_tag.get('src')
+                        logger.info(f"Found MP4 URL for playId {play_id}: {mp4_url}")
+                        return mp4_url
+            
+            logger.warning(f"No video URL found for playId {play_id} on attempt {attempt + 1}")
+            attempt += 1
+            if attempt < max_retries:
+                import time
+                time.sleep(2)  # Wait before retry
+                
+        except Exception as e:
+            logger.warning(f"Error extracting MP4 from sporty page for playId {play_id} on attempt {attempt + 1}: {str(e)}")
+            attempt += 1
+            if attempt < max_retries:
+                import time
+                time.sleep(2)
+    
+    return None
 
 def get_best_video_url(play_id):
     """
@@ -344,12 +336,12 @@ def get_play_id():
                             })
                             
                             # Extract the direct MP4 download URL
-                            download_url = extract_mp4_from_sporty_page(final_play_id, video_info["video_type"])
+                            download_url = get_video_url_from_sporty_page(final_play_id)
                             response_data["download_url"] = download_url
                         else:
                             # Try without video type as fallback
                             fallback_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={final_play_id}"
-                            download_url = extract_mp4_from_sporty_page(final_play_id)
+                            download_url = get_video_url_from_sporty_page(final_play_id)
                             
                             response_data.update({
                                 "video_type": None,
