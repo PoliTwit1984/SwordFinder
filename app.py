@@ -566,8 +566,8 @@ def run_patch_process():
                     update_fields = []
                     params = {
                         'game_pk': int(row['game_pk']) if pd.notna(row['game_pk']) else None,
-                        'at_bat_number': int(row['at_bat_number']) if pd.notna(row['at_bat_number']) else None,
-                        'pitch_number': int(row['pitch_number']) if pd.notna(row['pitch_number']) else None
+                        'player_name': str(row['player_name']) if pd.notna(row['player_name']) else None,
+                        'pitch_type': str(row['pitch_type']) if pd.notna(row['pitch_type']) else None
                     }
                     
                     # Add fields that might be missing
@@ -600,13 +600,13 @@ def run_patch_process():
                         params['pitch_name'] = str(row['pitch_name'])
                     
                     # Only update if we have fields and valid keys
-                    if update_fields and all(params[k] is not None for k in ['game_pk', 'at_bat_number', 'pitch_number']):
+                    if update_fields and all(params[k] is not None for k in ['game_pk', 'player_name', 'pitch_type']):
                         update_query = text(f"""
                             UPDATE statcast_pitches 
                             SET {', '.join(update_fields)}
                             WHERE game_pk = :game_pk
-                            AND at_bat_number = :at_bat_number
-                            AND pitch_number = :pitch_number
+                            AND player_name = :player_name
+                            AND pitch_type = :pitch_type
                         """)
                         
                         result = conn.execute(update_query, params)
