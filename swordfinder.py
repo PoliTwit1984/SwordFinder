@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 import numpy as np
+import requests
 from datetime import datetime
 import traceback
 
@@ -65,7 +66,10 @@ class SwordFinder:
             # Return top 5 sword swings
             top_swings = scored_swings.head(5)
             
-            return self._format_results(top_swings)
+            # Fetch playIds for each sword swing
+            results_with_playids = self._add_play_ids(top_swings)
+            
+            return self._format_results(results_with_playids)
             
         except Exception as e:
             logger.error(f"Error in find_sword_swings: {str(e)}")
@@ -187,6 +191,80 @@ class SwordFinder:
         
         return pd.Series(zone_penalty, index=data.index)
     
+    def _add_play_ids(self, data):
+        """
+        Fetch playIds for each sword swing using MLB Stats API
+        """
+        logger.info("Fetching playIds for sword swings")
+        
+        # Create a copy to avoid modifying original data
+        data_with_playids = data.copy()
+        
+        # Group by game_pk to minimize API calls
+        unique_games = data['game_pk'].unique()
+        
+        for game_pk in unique_games:
+            try:
+                # Fetch game data from MLB Stats API
+                mlb_api_url = f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+                response = requests.get(mlb_api_url, timeout=10)
+                response.raise_for_status()
+                game_data = response.json()
+                
+                # Parse plays data
+                all_plays = game_data['liveData']['plays']['allPlays']
+                
+                # For each sword swing in this game, find its playId
+                game_swings = data[data['game_pk'] == game_pk]
+                
+                for idx, swing in game_swings.iterrows():
+                    inning = swing['inning']
+                    pitch_number = swing['pitch_number']
+                    
+                    # Search for matching pitch in game data
+                    play_id = self._find_play_id_for_pitch(all_plays, inning, pitch_number)
+                    
+                    if play_id:
+                        data_with_playids.loc[idx, 'play_id'] = play_id
+                        logger.debug(f"Found playId {play_id} for game {game_pk}, inning {inning}, pitch {pitch_number}")
+                    else:
+                        logger.warning(f"No playId found for game {game_pk}, inning {inning}, pitch {pitch_number}")
+                        
+            except Exception as e:
+                logger.warning(f"Failed to fetch playIds for game {game_pk}: {str(e)}")
+                continue
+        
+        return data_with_playids
+    
+    def _find_play_id_for_pitch(self, all_plays, target_inning, target_pitch_number):
+        """
+        Find the playId for a specific pitch within game play data
+        """
+        for play in all_plays:
+            play_about = play.get('about', {})
+            play_inning = play_about.get('inning')
+            
+            # Only check plays from the target inning
+            if play_inning == target_inning:
+                play_events = play.get('playEvents', [])
+                
+                for event in play_events:
+                    event_pitch_number = event.get('pitchNumber')
+                    
+                    if event_pitch_number == target_pitch_number:
+                        # Look for UUID playId in the event
+                        uuid_play_id = (
+                            event.get('playId') or
+                            event.get('uuid') or
+                            event.get('guid') or
+                            event.get('playGuid')
+                        )
+                        
+                        if uuid_play_id:
+                            return str(uuid_play_id)
+        
+        return None
+    
     def _format_results(self, data):
         """
         Format the results for JSON response
@@ -194,6 +272,9 @@ class SwordFinder:
         results = []
         
         for _, row in data.iterrows():
+            play_id = self._safe_get(row, 'play_id', '')
+            video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}&videoType=AWAY" if play_id else ""
+            
             result = {
                 "player_name": self._safe_get(row, 'player_name', 'Unknown Player'),
                 "pitch_type": self._safe_get(row, 'pitch_type', 'Unknown'),
@@ -201,7 +282,8 @@ class SwordFinder:
                 "intercept_y": round(float(row['intercept_ball_minus_batter_pos_y_inches']), 1),
                 "swing_path_tilt": round(float(row['swing_path_tilt']), 1),
                 "sword_score": round(float(row['sword_score']), 1),
-                "play_id": self._safe_get(row, 'play_id', ''),
+                "play_id": play_id,
+                "video_url": video_url,
                 "game_pk": int(row['game_pk']) if pd.notna(row.get('game_pk')) else None,
                 "inning": int(row['inning']) if pd.notna(row.get('inning')) else None,
                 "pitch_number": int(row['pitch_number']) if pd.notna(row.get('pitch_number')) else None
