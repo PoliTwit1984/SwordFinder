@@ -411,11 +411,15 @@ class SwordFinder:
                             
                             if percentile >= 95:
                                 elite_metrics.append(f"Elite {metric_name}")
-                                highlights.append(f"Elite {metric_name} ({percentile}th percentile)")
-                            elif percentile >= 90:
-                                highlights.append(f"Excellent {metric_name} ({percentile}th percentile)")
-                            elif percentile <= 10:
-                                highlights.append(f"Poor {metric_name} ({percentile}th percentile)")
+                                highlights.append(f"Elite {metric_name} ({percentile:.1f}th percentile)")
+                            elif percentile >= 85:
+                                highlights.append(f"Excellent {metric_name} ({percentile:.1f}th percentile)")
+                            elif percentile >= 75:
+                                highlights.append(f"Above Average {metric_name} ({percentile:.1f}th percentile)")
+                            elif percentile <= 15:
+                                highlights.append(f"Poor {metric_name} ({percentile:.1f}th percentile)")
+                            elif percentile <= 25:
+                                highlights.append(f"Below Average {metric_name} ({percentile:.1f}th percentile)")
                         
                         result['percentile_highlights'] = highlights
                         result['elite_metrics'] = elite_metrics
