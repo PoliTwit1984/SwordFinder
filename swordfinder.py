@@ -279,18 +279,35 @@ class SwordFinder:
             download_url = self._get_mp4_download_url(play_id) if play_id else None
             
             result = {
+                "play_id": play_id,
+                "game_pk": int(row['game_pk']) if pd.notna(row.get('game_pk')) else None,
                 "player_name": self._safe_get(row, 'player_name', 'Unknown Player'),
                 "pitch_type": self._safe_get(row, 'pitch_type', 'Unknown'),
+                "pitch_name": self._get_pitch_name(self._safe_get(row, 'pitch_type', 'Unknown')),
+                "release_speed": round(float(row['release_speed']), 1) if pd.notna(row.get('release_speed')) else None,
+                "release_spin_rate": int(row['release_spin_rate']) if pd.notna(row.get('release_spin_rate')) else None,
+                "plate_x": round(float(row['plate_x']), 2) if pd.notna(row.get('plate_x')) else None,
+                "plate_z": round(float(row['plate_z']), 2) if pd.notna(row.get('plate_z')) else None,
+                "sz_top": round(float(row['sz_top']), 2) if pd.notna(row.get('sz_top')) else None,
+                "sz_bot": round(float(row['sz_bot']), 2) if pd.notna(row.get('sz_bot')) else None,
                 "bat_speed": round(float(row['bat_speed']), 1),
-                "intercept_y": round(float(row['intercept_ball_minus_batter_pos_y_inches']), 1),
                 "swing_path_tilt": round(float(row['swing_path_tilt']), 1),
-                "sword_score": round(float(row['sword_score']), 1),
-                "play_id": play_id,
+                "attack_angle": round(float(row['attack_angle']), 1) if pd.notna(row.get('attack_angle')) else None,
+                "intercept_ball_minus_batter_pos_y_inches": round(float(row['intercept_ball_minus_batter_pos_y_inches']), 1),
+                "description": self._safe_get(row, 'description', 'Unknown'),
+                "events": self._safe_get(row, 'events', 'Unknown'),
+                "inning": int(row['inning']) if pd.notna(row.get('inning')) else None,
+                "balls": int(row['balls']) if pd.notna(row.get('balls')) else None,
+                "strikes": int(row['strikes']) if pd.notna(row.get('strikes')) else None,
+                "at_bat_number": int(row['at_bat_number']) if pd.notna(row.get('at_bat_number')) else None,
+                "pitch_number": int(row['pitch_number']) if pd.notna(row.get('pitch_number')) else None,
+                "home_team": self._safe_get(row, 'home_team', 'Unknown'),
+                "away_team": self._safe_get(row, 'away_team', 'Unknown'),
+                "batter": int(row['batter']) if pd.notna(row.get('batter')) else None,
+                "pitcher": int(row['pitcher']) if pd.notna(row.get('pitcher')) else None,
                 "video_url": video_url,
                 "download_url": download_url,
-                "game_pk": int(row['game_pk']) if pd.notna(row.get('game_pk')) else None,
-                "inning": int(row['inning']) if pd.notna(row.get('inning')) else None,
-                "pitch_number": int(row['pitch_number']) if pd.notna(row.get('pitch_number')) else None
+                "sword_score": round(float(row['sword_score']), 1)
             }
             results.append(result)
         
@@ -344,6 +361,26 @@ class SwordFinder:
                     time.sleep(1)
         
         return None
+    
+    def _get_pitch_name(self, pitch_type):
+        """
+        Convert pitch type abbreviation to full pitch name
+        """
+        pitch_names = {
+            'FF': 'Four-Seam Fastball',
+            'SI': 'Sinker',
+            'FC': 'Cutter',
+            'SL': 'Slider',
+            'CU': 'Curveball',
+            'KC': 'Knuckle Curve',
+            'CH': 'Changeup',
+            'FS': 'Splitter',
+            'KN': 'Knuckleball',
+            'EP': 'Eephus',
+            'SC': 'Screwball',
+            'FO': 'Forkball'
+        }
+        return pitch_names.get(pitch_type, pitch_type)
     
     def _safe_get(self, row, column, default):
         """
