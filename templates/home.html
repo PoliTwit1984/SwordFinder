@@ -231,13 +231,22 @@
                                     </div>
                                     
                                     <div class="mb-3">
+                                        ${swing.mp4_downloaded && swing.local_mp4_path ? `
+                                        <div class="video-container">
+                                            <video controls class="w-100 rounded" style="max-height: 300px;">
+                                                <source src="/${swing.local_mp4_path}" type="video/mp4">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        </div>
+                                        ` : `
                                         <div class="video-placeholder bg-dark rounded p-4 text-center" style="height: 200px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--bs-border-color);">
                                             <div>
                                                 <i class="fas fa-play-circle fa-3x text-primary mb-2"></i>
                                                 <div class="fw-bold">Sword Swing Video</div>
-                                                <small class="text-muted">Click below to watch</small>
+                                                <small class="text-muted">Processing video...</small>
                                             </div>
                                         </div>
+                                        `}
                                     </div>
                                     
                                     ${swing.percentile_highlights && swing.percentile_highlights.length > 0 ? `

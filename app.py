@@ -6,6 +6,8 @@ from datetime import datetime
 import traceback
 from bs4 import BeautifulSoup
 from swordfinder import SwordFinder
+from db_swordfinder import DatabaseSwordFinder
+from models import create_tables
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -15,8 +17,12 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 
-# Initialize SwordFinder
-sword_finder = SwordFinder()
+# Initialize database tables
+create_tables()
+
+# Initialize both sword finders
+sword_finder = SwordFinder()  # Keep for fallback
+db_sword_finder = DatabaseSwordFinder()  # New database-powered version
 
 @app.before_request
 def force_https():
@@ -186,8 +192,8 @@ def find_swords():
         
         logger.info(f"Processing sword swing analysis for date: {date_str}")
         
-        # Find sword swings
-        sword_swings = sword_finder.find_sword_swings(date_str)
+        # Find sword swings using database-powered version
+        sword_swings = db_sword_finder.find_sword_swings(date_str)
         
         return jsonify({
             "success": True,
