@@ -51,10 +51,10 @@
                     </div>
                 </div>
 
-                <!-- API Tester -->
+                <!-- Sword Swings API Tester -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h3 class="card-title mb-0"><i class="fas fa-flask me-2"></i>API Tester</h3>
+                        <h3 class="card-title mb-0"><i class="fas fa-flask me-2"></i>Sword Swings API Tester</h3>
                     </div>
                     <div class="card-body">
                         <form id="apiForm">
@@ -93,6 +93,62 @@
                         <div id="errorAlert" class="alert alert-danger mt-4" style="display: none;">
                             <i class="fas fa-exclamation-triangle me-2"></i>
                             <span id="errorMessage"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PlayID API Tester -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0"><i class="fas fa-video me-2"></i>PlayID API Tester</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Get video URLs for specific pitches using game data</p>
+                        
+                        <form id="playIdForm">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="gamePkInput" class="form-label">Game PK</label>
+                                        <input type="number" class="form-control" id="gamePkInput" value="777796" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="inningInput" class="form-label">Inning</label>
+                                        <input type="number" class="form-control" id="inningInput" value="9" min="1" max="15" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="pitchNumberInput" class="form-label">Pitch Number</label>
+                                        <input type="number" class="form-control" id="pitchNumberInput" value="5" min="1" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success" id="lookupBtn">
+                                <i class="fas fa-search me-2"></i>Get PlayID & Video
+                            </button>
+                        </form>
+
+                        <!-- PlayID Loading Spinner -->
+                        <div id="playIdLoadingSpinner" class="text-center mt-4" style="display: none;">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Looking up play data...</p>
+                        </div>
+
+                        <!-- PlayID Results -->
+                        <div id="playIdResults" class="mt-4" style="display: none;">
+                            <h5>PlayID Results</h5>
+                            <div id="playIdResultsContent"></div>
+                        </div>
+
+                        <!-- PlayID Error Display -->
+                        <div id="playIdErrorAlert" class="alert alert-danger mt-4" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="playIdErrorMessage"></span>
                         </div>
                     </div>
                 </div>
@@ -355,6 +411,128 @@
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         document.getElementById('dateInput').value = yesterday.toISOString().split('T')[0];
+        
+        // PlayID Form Handler
+        document.getElementById('playIdForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const gamePkInput = document.getElementById('gamePkInput');
+            const inningInput = document.getElementById('inningInput');
+            const pitchNumberInput = document.getElementById('pitchNumberInput');
+            const lookupBtn = document.getElementById('lookupBtn');
+            const playIdLoadingSpinner = document.getElementById('playIdLoadingSpinner');
+            const playIdResults = document.getElementById('playIdResults');
+            const playIdResultsContent = document.getElementById('playIdResultsContent');
+            const playIdErrorAlert = document.getElementById('playIdErrorAlert');
+            
+            // Reset UI
+            playIdLoadingSpinner.style.display = 'block';
+            playIdResults.style.display = 'none';
+            playIdErrorAlert.style.display = 'none';
+            lookupBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/playid', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        game_pk: parseInt(gamePkInput.value),
+                        inning: parseInt(inningInput.value),
+                        pitch_number: parseInt(pitchNumberInput.value)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayPlayIdResults(data);
+                } else {
+                    showPlayIdError(data.error || 'Unknown error occurred');
+                }
+                
+            } catch (error) {
+                showPlayIdError('Network error: ' + error.message);
+            } finally {
+                playIdLoadingSpinner.style.display = 'none';
+                lookupBtn.disabled = false;
+            }
+        });
+        
+        function displayPlayIdResults(data) {
+            const playIdResultsContent = document.getElementById('playIdResultsContent');
+            const playIdResults = document.getElementById('playIdResults');
+            
+            let html = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Found PlayID for Game ${data.game_pk}, Inning ${data.inning}, Pitch ${data.pitch_number}
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Play Information</h6>
+                                <p><strong>PlayID:</strong> ${data.playId}</p>
+                                <p><strong>Description:</strong> ${data.description}</p>
+                                <p><strong>Game:</strong> ${data.game_pk}</p>
+                                <p><strong>Inning:</strong> ${data.inning}</p>
+                                <p><strong>Pitch #:</strong> ${data.pitch_number}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Video Link</h6>
+                                <p class="small text-muted">Baseball Savant Video URL:</p>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="${data.video_url}" readonly id="videoUrlInput">
+                                    <button class="btn btn-outline-primary" type="button" onclick="copyVideoUrl()">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-2">
+                                    <a href="${data.video_url}" target="_blank" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>Open Video
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h6>Raw JSON Response:</h6>
+                    <pre class="code-block"><code>${JSON.stringify(data, null, 2)}</code></pre>
+                </div>
+            `;
+            
+            playIdResultsContent.innerHTML = html;
+            playIdResults.style.display = 'block';
+        }
+        
+        function showPlayIdError(message) {
+            const playIdErrorAlert = document.getElementById('playIdErrorAlert');
+            const playIdErrorMessage = document.getElementById('playIdErrorMessage');
+            
+            playIdErrorMessage.textContent = message;
+            playIdErrorAlert.style.display = 'block';
+        }
+        
+        function copyVideoUrl() {
+            const videoUrlInput = document.getElementById('videoUrlInput');
+            videoUrlInput.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const copyBtn = event.target.closest('button');
+            const originalHTML = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => {
+                copyBtn.innerHTML = originalHTML;
+            }, 2000);
+        }
     </script>
 </body>
 </html>
