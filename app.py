@@ -544,14 +544,113 @@ def csv_patch_monitor():
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
-                <button class="button" onclick="window.location.href='/csv-patch-status'">
-                    View Live Patch Status
+                <button class="button" onclick="startCSVPatch()">
+                    Start CSV Patch
                 </button>
             </div>
+        </div>
+        
+        <script>
+            function startCSVPatch() {
+                if (confirm('Start CSV patch to update all missing database fields from your complete CSV file?')) {
+                    fetch('/start-csv-patch', {method: 'POST'})
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = '/csv-patch-status';
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    });
+                }
+            }
+        </script>
         </div>
     </body>
     </html>
     """)
+
+@app.route('/start-csv-patch', methods=['POST'])
+def start_csv_patch():
+    """Start the CSV patch process"""
+    global patch_status
+    
+    if patch_status["status"] == "Running":
+        return jsonify({"success": False, "error": "Patch already running"})
+    
+    # Reset status for CSV patch
+    patch_status.update({
+        "status": "Running",
+        "rows_scanned": 0,
+        "rows_updated": 0,
+        "current_processing": "Loading CSV file...",
+        "start_time": time_module.time(),
+        "error_message": ""
+    })
+    
+    # Start CSV patch in background
+    thread = threading.Thread(target=run_csv_patch_process)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"success": True})
+
+@app.route('/csv-patch-status')
+def csv_patch_status():
+    """Live CSV patch status monitoring"""
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>🗡️ CSV Patch Status</title>
+        <meta http-equiv="refresh" content="2">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
+            .container { max-width: 900px; margin: 0 auto; }
+            .status-card { background: #2d2d2d; padding: 25px; border-radius: 12px; margin: 20px 0; }
+            .status-running { border-left: 6px solid #4CAF50; }
+            .status-completed { border-left: 6px solid #2196F3; }
+            .status-error { border-left: 6px solid #F44336; }
+            .progress-bar { background: #444; height: 25px; border-radius: 12px; overflow: hidden; margin: 15px 0; }
+            .progress-fill { background: linear-gradient(90deg, #4CAF50, #45a049); height: 100%; transition: width 0.5s; }
+            .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin: 25px 0; }
+            .stat { background: #333; padding: 20px; border-radius: 10px; text-align: center; }
+            .stat-value { font-size: 2.2em; font-weight: bold; color: #4CAF50; margin-bottom: 8px; }
+            .stat-label { color: #bbb; font-size: 0.9em; }
+            h1 { text-align: center; color: #4CAF50; margin-bottom: 30px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🗡️ CSV Patch Status</h1>
+            
+            <div class="status-card status-{{ status.status.lower() }}">
+                <h2>Status: {{ status.status }}</h2>
+                <p><strong>Current Task:</strong> {{ status.current_processing }}</p>
+                <p><strong>Elapsed Time:</strong> {{ "%.1f"|format(status.elapsed_time) }}s</p>
+                {% if status.error_message %}
+                    <p style="color: #F44336;"><strong>Error:</strong> {{ status.error_message }}</p>
+                {% endif %}
+            </div>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">{{ "{:,}"|format(status.rows_scanned) }}</div>
+                    <div class="stat-label">Rows Processed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ "{:,}"|format(status.rows_updated) }}</div>
+                    <div class="stat-label">Records Updated</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ "%.1f"|format((status.rows_scanned / status.elapsed_time) if status.elapsed_time > 0 else 0) }}</div>
+                    <div class="stat-label">Records/sec</div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """, status=patch_status, now=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 @app.route('/start-patch', methods=['POST'])
 def start_patch():
