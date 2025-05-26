@@ -282,6 +282,7 @@ class SwordFinder:
                 "play_id": play_id,
                 "game_pk": int(row['game_pk']) if pd.notna(row.get('game_pk')) else None,
                 "player_name": self._safe_get(row, 'player_name', 'Unknown Player'),
+                "pitcher_name": self._safe_get(row, 'player_name', 'Unknown Pitcher'),
                 "pitch_type": self._safe_get(row, 'pitch_type', 'Unknown'),
                 "pitch_name": self._get_pitch_name(self._safe_get(row, 'pitch_type', 'Unknown')),
                 "release_speed": round(float(row['release_speed']), 1) if pd.notna(row.get('release_speed')) else None,
