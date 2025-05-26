@@ -193,14 +193,10 @@ def find_swords():
         logger.info(f"Processing sword swing analysis for date: {date_str}")
         
         # Find sword swings using database-powered version
-        sword_swings = db_sword_finder.find_sword_swings(date_str)
+        result = db_sword_finder.find_sword_swings(date_str)
         
-        return jsonify({
-            "success": True,
-            "data": sword_swings,
-            "count": len(sword_swings),
-            "date": date_str
-        })
+        # Return the result directly since it already has the proper format
+        return jsonify(result)
         
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
