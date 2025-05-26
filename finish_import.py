@@ -6,6 +6,7 @@ import pandas as pd
 from models_complete import get_db, StatcastPitch
 from sqlalchemy import text
 import time
+from datetime import datetime
 
 def safe_float(value):
     try:
@@ -94,11 +95,14 @@ def finish_import():
             db.add_all(batch_records)
             db.commit()
             
-            # Progress update
+            # Progress update with timestamp
             current_total = db.execute(text('SELECT COUNT(*) FROM statcast_pitches')).scalar()
             current_progress = (current_total / total_target) * 100
+            remaining = total_target - current_total
             
-            print(f"✅ Progress: {current_total:,} records ({current_progress:.1f}%)")
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"✅ [{timestamp}] Progress: {current_total:,} records ({current_progress:.1f}%) - {remaining:,} remaining")
+            print(f"📦 Batch {batch_num}/{total_batches} complete - Import is actively running...")
             
             # Check for completion
             if current_total >= total_target:
