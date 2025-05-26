@@ -396,6 +396,58 @@ def health_check():
         "version": "1.0.0"
     })
 
+@app.route('/patch-monitor', methods=['GET'])
+def patch_monitor():
+    """Database patch control center"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>🗡️ Database Patch Control</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
+            .container { max-width: 600px; margin: 0 auto; text-align: center; }
+            .card { background: #2d2d2d; padding: 30px; border-radius: 10px; margin: 20px 0; }
+            .button { background: #4CAF50; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; font-size: 18px; margin: 10px; }
+            .button:hover { background: #45a049; }
+            .info { background: #333; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🗡️ SwordFinder Database Patch Control</h1>
+            
+            <div class="card">
+                <h2>Fix Missing Pitch Details</h2>
+                <p>Your database has 226,833 records but is missing critical details:</p>
+                
+                <div class="info">
+                    <strong>Missing Data:</strong><br>
+                    • Team names (showing "Unknown @ Unknown" instead of "BOS @ BAL")<br>
+                    • Pitch velocities (showing "N/A" instead of "96.6 mph")<br>
+                    • Spin rates and locations<br>
+                </div>
+                
+                <p>The patch tool will pull fresh data from MLB's official source and update your database with the missing information.</p>
+                
+                <a href="http://localhost:5001/monitor" target="_blank">
+                    <button class="button">🔧 Open Patch Monitor</button>
+                </a>
+                
+                <p><small>This will open the patch control center in a new tab where you can start the database fix process.</small></p>
+            </div>
+        </div>
+        
+        <script>
+            // Auto-open patch monitor
+            setTimeout(() => {
+                window.open('http://localhost:5001/monitor', '_blank');
+            }, 1000);
+        </script>
+    </body>
+    </html>
+    """
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
