@@ -80,6 +80,11 @@
                         <div id="results" class="mt-4" style="display: none;">
                             <h5>Results</h5>
                             <div id="resultsContent"></div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-outline-secondary" id="viewRawJsonBtn" onclick="showRawJsonModal()">
+                                    <i class="fas fa-code me-2"></i>View Raw JSON
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Error Display -->
@@ -164,6 +169,28 @@
   ]
 }</code></pre>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw JSON Modal -->
+    <div class="modal fade" id="rawJsonModal" tabindex="-1" aria-labelledby="rawJsonModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rawJsonModalLabel">
+                        <i class="fas fa-code me-2"></i>Raw JSON Response
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyJsonToClipboard()">
+                            <i class="fas fa-copy me-1"></i>Copy
+                        </button>
+                    </div>
+                    <pre class="code-block" style="max-height: 400px; overflow-y: auto;"><code id="rawJsonContent"></code></pre>
                 </div>
             </div>
         </div>
@@ -280,10 +307,35 @@
             errorAlert.style.display = 'block';
         }
         
+        // Store the latest API response for the modal
+        let latestApiResponse = null;
+        
         function updateExampleResponse(data) {
-            const exampleResponseElement = document.querySelector('.code-block code');
-            if (exampleResponseElement) {
-                exampleResponseElement.textContent = JSON.stringify(data, null, 2);
+            latestApiResponse = data;
+        }
+        
+        function showRawJsonModal() {
+            if (latestApiResponse) {
+                const jsonContent = document.getElementById('rawJsonContent');
+                jsonContent.textContent = JSON.stringify(latestApiResponse, null, 2);
+                
+                const modal = new bootstrap.Modal(document.getElementById('rawJsonModal'));
+                modal.show();
+            }
+        }
+        
+        function copyJsonToClipboard() {
+            if (latestApiResponse) {
+                const jsonString = JSON.stringify(latestApiResponse, null, 2);
+                navigator.clipboard.writeText(jsonString).then(function() {
+                    // Change button text temporarily to show success
+                    const copyBtn = document.querySelector('#rawJsonModal .btn-outline-primary');
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                    }, 2000);
+                });
             }
         }
         
