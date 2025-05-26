@@ -252,6 +252,15 @@
                                     </div>
                                     ` : ''}
                                     
+                                    ${swing.expert_analysis ? `
+                                    <div class="mb-3">
+                                        <h6 class="text-info mb-2"><i class="fas fa-brain me-1"></i>Expert Analysis</h6>
+                                        <div class="small bg-dark-subtle rounded p-2 text-light" style="font-style: italic;">
+                                            "${swing.expert_analysis}"
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                    
                                     <div class="d-grid gap-2">
                                         ${swing.video_url ? `<a href="${swing.video_url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-play me-1"></i>Watch Video on Baseball Savant</a>` : ''}
                                         ${swing.download_url ? `<a href="${swing.download_url}" target="_blank" class="btn btn-outline-success btn-sm"><i class="fas fa-download me-1"></i>Download MP4</a>` : ''}

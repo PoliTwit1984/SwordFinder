@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 import traceback
 from percentile_analyzer import PercentileAnalyzer
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -428,12 +429,122 @@ class SwordFinder:
                         if elite_metrics:
                             result['what_made_it_special'] = f"This {result['pitch_name'].lower()} had {', '.join(elite_metrics).lower()}, making it exceptionally deceptive"
                         
+                        # Add expert AI analysis
+                        expert_analysis = self._get_expert_analysis(row, result, percentile_analysis)
+                        if expert_analysis:
+                            result['expert_analysis'] = expert_analysis
+                        
                 except Exception as e:
                     logger.warning(f"Error adding percentile analysis: {e}")
                     result['percentile_analysis'] = None
             results.append(result)
         
         return results
+    
+    def _get_expert_analysis(self, row, result, percentile_analysis):
+        """
+        Get expert AI analysis using OpenRouter Claude Sonnet
+        """
+        try:
+            openrouter_api_key = os.environ.get('OPENROUTER_API_KEY')
+            if not openrouter_api_key:
+                logger.warning("No OpenRouter API key found")
+                return None
+            
+            # Prepare pitch and swing data for AI analysis
+            pitch_data = {
+                'pitch_type': result.get('pitch_name', 'Unknown'),
+                'velocity': result.get('release_speed', 0),
+                'spin_rate': result.get('release_spin_rate', 0),
+                'horizontal_break': self._safe_get(row, 'pfx_x', 0),
+                'vertical_break': self._safe_get(row, 'pfx_z', 0),
+                'plate_x': result.get('plate_x', 0),
+                'plate_z': result.get('plate_z', 0),
+                'sz_top': result.get('sz_top', 3.5),
+                'sz_bot': result.get('sz_bot', 1.5),
+                'bat_speed': result.get('bat_speed', 0),
+                'swing_tilt': result.get('swing_path_tilt', 0),
+                'intercept_y': result.get('intercept_ball_minus_batter_pos_y_inches', 0),
+                'sword_score': result.get('sword_score', 0)
+            }
+            
+            # Create analysis prompt
+            prompt = f"""Role & Task:
+
+You are a baseball analyst specialized in pitch quality and batter performance analysis. Your task is to quickly and clearly determine why a given swing-and-miss pitch resulted in a strikeout ("sword") based solely on provided raw Statcast data.
+
+Data Provided (Statcast):
+• Pitch Metrics:
+  - Pitch type: {pitch_data['pitch_type']}
+  - Pitch velocity: {pitch_data['velocity']} MPH
+  - Spin rate: {pitch_data['spin_rate']} RPM
+  - Vertical break: {pitch_data['vertical_break']:.2f} inches
+  - Horizontal break: {pitch_data['horizontal_break']:.2f} inches
+  - Plate X (horizontal location): {pitch_data['plate_x']:.2f} (negative = inside to RHH)
+  - Plate Z (vertical location): {pitch_data['plate_z']:.2f} feet
+  - Strike zone top: {pitch_data['sz_top']:.2f} ft
+  - Strike zone bottom: {pitch_data['sz_bot']:.2f} ft
+
+• Batter Swing Metrics:
+  - Bat speed: {pitch_data['bat_speed']} MPH
+  - Intercept Y (timing): {pitch_data['intercept_y']:.1f} inches behind ball
+  - Swing path tilt: {pitch_data['swing_tilt']:.1f} degrees
+  - Sword Score: {pitch_data['sword_score']}/100
+
+Your Output (Concise, Sharp Analysis):
+
+In one or two concise sentences, provide your expert assessment, clearly stating:
+1. Pitch Quality: Is this pitch elite (top 20% in spin, velo, break, or location)? Average? Below average?
+2. Batter Performance: Was the batter genuinely fooled by pitch movement, speed, location, or was the swing simply poorly timed or executed by the batter?
+3. Sword Verdict: Clearly state if this strikeout was mostly due to exceptional pitch quality ("Pitcher's sword") or batter error ("Batter's fail").
+
+Use engaging, viral-friendly language. Be sarcastic or witty if the situation clearly warrants it, but remain professional and baseball-smart.
+
+Goal:
+Your analysis should quickly inform baseball-savvy audiences why this swing-and-miss was a "sword" and if the batter or pitcher deserves the credit (or blame).
+Your phrasing should be witty and concise enough to be instantly sharable and memorable on social media."""
+
+            # Make API call to OpenRouter
+            headers = {
+                'Authorization': f'Bearer {openrouter_api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            payload = {
+                'model': 'anthropic/claude-3.5-sonnet',
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': prompt
+                    }
+                ],
+                'max_tokens': 200,
+                'temperature': 0.7
+            }
+            
+            response = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    analysis = data['choices'][0]['message']['content'].strip()
+                    logger.debug(f"Expert analysis generated: {analysis[:100]}...")
+                    return analysis
+                else:
+                    logger.warning("No analysis returned from OpenRouter")
+                    return None
+            else:
+                logger.warning(f"OpenRouter API error: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Error generating expert analysis: {e}")
+            return None
     
     def _get_mp4_download_url(self, play_id, max_retries=3):
         """
