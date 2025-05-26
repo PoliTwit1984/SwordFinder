@@ -452,20 +452,26 @@ class SwordFinder:
                 return None
             
             # Prepare pitch and swing data for AI analysis
+            def safe_float(value, default=0):
+                try:
+                    return float(value) if value is not None else default
+                except (ValueError, TypeError):
+                    return default
+            
             pitch_data = {
                 'pitch_type': result.get('pitch_name', 'Unknown'),
-                'velocity': result.get('release_speed', 0),
-                'spin_rate': result.get('release_spin_rate', 0),
-                'horizontal_break': self._safe_get(row, 'pfx_x', 0),
-                'vertical_break': self._safe_get(row, 'pfx_z', 0),
-                'plate_x': result.get('plate_x', 0),
-                'plate_z': result.get('plate_z', 0),
-                'sz_top': result.get('sz_top', 3.5),
-                'sz_bot': result.get('sz_bot', 1.5),
-                'bat_speed': result.get('bat_speed', 0),
-                'swing_tilt': result.get('swing_path_tilt', 0),
-                'intercept_y': result.get('intercept_ball_minus_batter_pos_y_inches', 0),
-                'sword_score': result.get('sword_score', 0)
+                'velocity': safe_float(result.get('release_speed')),
+                'spin_rate': safe_float(result.get('release_spin_rate')),
+                'horizontal_break': safe_float(self._safe_get(row, 'pfx_x', 0)),
+                'vertical_break': safe_float(self._safe_get(row, 'pfx_z', 0)),
+                'plate_x': safe_float(result.get('plate_x')),
+                'plate_z': safe_float(result.get('plate_z')),
+                'sz_top': safe_float(result.get('sz_top'), 3.5),
+                'sz_bot': safe_float(result.get('sz_bot'), 1.5),
+                'bat_speed': safe_float(result.get('bat_speed')),
+                'swing_tilt': safe_float(result.get('swing_path_tilt')),
+                'intercept_y': safe_float(result.get('intercept_ball_minus_batter_pos_y_inches')),
+                'sword_score': safe_float(result.get('sword_score'))
             }
             
             # Create analysis prompt
