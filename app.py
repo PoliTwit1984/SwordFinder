@@ -595,6 +595,48 @@ def start_csv_patch():
     
     return jsonify({"success": True})
 
+@app.route('/database-status')
+def database_status():
+    """Check actual database completion status"""
+    try:
+        from models import get_db
+        
+        with get_db() as db:
+            # Get completion status by date
+            result = db.execute("""
+                SELECT game_date, 
+                       COUNT(*) as total_pitches,
+                       COUNT(home_team) as has_teams,
+                       COUNT(release_spin_rate) as has_spin_rates,
+                       ROUND(COUNT(home_team) * 100.0 / COUNT(*), 1) as completion_pct
+                FROM statcast_pitches 
+                GROUP BY game_date
+                ORDER BY game_date
+            """).fetchall()
+            
+            dates_data = []
+            for row in result:
+                dates_data.append({
+                    'date': row[0],
+                    'total': row[1], 
+                    'teams': row[2],
+                    'spin_rates': row[3],
+                    'completion': row[4]
+                })
+            
+            return jsonify({
+                'success': True,
+                'dates': dates_data,
+                'summary': {
+                    'total_dates': len(dates_data),
+                    'completed_dates': len([d for d in dates_data if d['completion'] == 100.0]),
+                    'march_30_status': next((d for d in dates_data if d['date'] == '2025-03-30'), None)
+                }
+            })
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/csv-patch-status')
 def csv_patch_status():
     """Live CSV patch status monitoring"""
