@@ -167,6 +167,11 @@ def get_play_id():
         # Parse liveData.plays.allPlays
         try:
             all_plays = game_data['liveData']['plays']['allPlays']
+            # Debug: log the structure of the first play
+            if len(all_plays) > 0:
+                first_play = all_plays[0]
+                logger.debug(f"First play keys: {list(first_play.keys())}")
+                logger.debug(f"First play sample: {dict(list(first_play.items())[:5])}")
         except KeyError as e:
             logger.error(f"Unexpected MLB API response structure: {e}")
             return jsonify({
@@ -178,13 +183,20 @@ def get_play_id():
         logger.debug(f"Searching through {len(all_plays)} plays")
         
         for play_idx, play in enumerate(all_plays):
-            # Try different possible locations for playId
-            play_id = play.get('playId') or play.get('about', {}).get('atBatIndex')
+            # Look for the correct UUID playId - might be nested differently
+            play_id = play.get('playId')
+            uuid_play_id = play.get('playGuid') or play.get('uuid') or play.get('guid')
             play_events = play.get('playEvents', [])
             play_about = play.get('about', {})
             play_inning = play_about.get('inning')
             
-            logger.debug(f"Play {play_idx}: playId={play_id}, inning={play_inning}")
+            logger.debug(f"Play {play_idx}: playId={play_id}, uuidPlayId={uuid_play_id}, inning={play_inning}")
+            
+            # If we find events, also log their structure for debugging
+            if play_idx < 3 and len(play_events) > 0:  # Log first few plays for debugging
+                logger.debug(f"Play {play_idx} structure: {list(play.keys())}")
+                if play_events:
+                    logger.debug(f"First event structure: {list(play_events[0].keys())}")
             
             # Only check plays from the target inning for efficiency
             if play_inning == inning:
@@ -201,14 +213,31 @@ def get_play_id():
                         # Optional: verify it's a swinging strike
                         description = event.get('details', {}).get('description', '')
                         
-                        logger.info(f"Found matching pitch: playId={play_id}, description={description}")
+                        # Look for the correct UUID playId in various possible locations
+                        uuid_play_id = (
+                            play.get('playId') or 
+                            event.get('playId') or
+                            event.get('uuid') or
+                            event.get('guid') or
+                            event.get('playGuid') or
+                            play.get('about', {}).get('playId') or
+                            event.get('about', {}).get('playId')
+                        )
+                        
+                        logger.info(f"Found matching pitch: numericId={play_id}, uuidPlayId={uuid_play_id}, description={description}")
+                        logger.debug(f"Event keys for debugging: {list(event.keys())}")
+                        
+                        # Use the UUID if found, otherwise fall back to numeric
+                        final_play_id = uuid_play_id if uuid_play_id else play_id
                         
                         # Generate video URL
-                        video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}&videoType=AWAY"
+                        video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={final_play_id}&videoType=AWAY"
                         
                         return jsonify({
                             "success": True,
-                            "playId": play_id,
+                            "playId": final_play_id,
+                            "numeric_id": play_id,
+                            "uuid_id": uuid_play_id,
                             "video_url": video_url,
                             "description": description,
                             "game_pk": game_pk,
