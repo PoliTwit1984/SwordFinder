@@ -503,6 +503,56 @@ def patch_monitor():
     </html>
     """, status=patch_status, now=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
+@app.route('/csv-patch-monitor')
+def csv_patch_monitor():
+    """CSV patch monitoring interface"""
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>🗡️ CSV Database Patch Monitor</title>
+        <meta http-equiv="refresh" content="2">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
+            .container { max-width: 900px; margin: 0 auto; }
+            .status-card { background: #2d2d2d; padding: 25px; border-radius: 12px; margin: 20px 0; }
+            .status-running { border-left: 6px solid #4CAF50; }
+            .status-ready { border-left: 6px solid #FFC107; }
+            .status-error { border-left: 6px solid #F44336; }
+            .status-completed { border-left: 6px solid #2196F3; }
+            .progress-bar { background: #444; height: 25px; border-radius: 12px; overflow: hidden; margin: 15px 0; }
+            .progress-fill { background: linear-gradient(90deg, #4CAF50, #45a049); height: 100%; transition: width 0.5s; }
+            .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin: 25px 0; }
+            .stat { background: #333; padding: 20px; border-radius: 10px; text-align: center; }
+            .stat-value { font-size: 2.2em; font-weight: bold; color: #4CAF50; margin-bottom: 8px; }
+            .stat-label { color: #bbb; font-size: 0.9em; }
+            .button { background: #4CAF50; color: white; padding: 15px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 10px; }
+            .button:disabled { background: #666; cursor: not-allowed; }
+            h1 { text-align: center; color: #4CAF50; margin-bottom: 30px; }
+            .eta { background: #444; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🗡️ CSV Database Patch Monitor</h1>
+            
+            <div class="status-card status-ready">
+                <h2>Ready to Patch Database from CSV</h2>
+                <p><strong>Source:</strong> complete_statcast_2025.csv (226,833 records)</p>
+                <p><strong>Target:</strong> PostgreSQL statcast_pitches table</p>
+                <p><strong>Action:</strong> Update missing team names, spin rates, and other fields</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button class="button" onclick="window.location.href='/csv-patch-status'">
+                    View Live Patch Status
+                </button>
+            </div>
+        </div>
+    </body>
+    </html>
+    """)
+
 @app.route('/start-patch', methods=['POST'])
 def start_patch():
     """Start the database patching process"""
