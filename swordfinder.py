@@ -275,6 +275,9 @@ class SwordFinder:
             play_id = self._safe_get(row, 'play_id', '')
             video_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}" if play_id else ""
             
+            # Get direct MP4 download URL
+            download_url = self._get_mp4_download_url(play_id) if play_id else None
+            
             result = {
                 "player_name": self._safe_get(row, 'player_name', 'Unknown Player'),
                 "pitch_type": self._safe_get(row, 'pitch_type', 'Unknown'),
@@ -284,6 +287,7 @@ class SwordFinder:
                 "sword_score": round(float(row['sword_score']), 1),
                 "play_id": play_id,
                 "video_url": video_url,
+                "download_url": download_url,
                 "game_pk": int(row['game_pk']) if pd.notna(row.get('game_pk')) else None,
                 "inning": int(row['inning']) if pd.notna(row.get('inning')) else None,
                 "pitch_number": int(row['pitch_number']) if pd.notna(row.get('pitch_number')) else None
@@ -291,6 +295,55 @@ class SwordFinder:
             results.append(result)
         
         return results
+    
+    def _get_mp4_download_url(self, play_id, max_retries=3):
+        """
+        Extract the direct MP4 download URL from a Baseball Savant sporty-videos page
+        
+        Args:
+            play_id (str): The UUID playId for the pitch
+            max_retries (int): Number of retry attempts
+            
+        Returns:
+            str: Direct MP4 URL if found, None otherwise
+        """
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                from bs4 import BeautifulSoup
+                
+                page_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
+                logger.debug(f"Extracting MP4 from: {page_url} (attempt {attempt + 1})")
+                
+                response = requests.get(page_url, timeout=15)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.content, 'html.parser')
+                video_container = soup.find('div', class_='video-box')
+                
+                if video_container:
+                    video_tag = video_container.find('video')
+                    if video_tag:
+                        source_tag = video_tag.find('source', {'type': 'video/mp4'})
+                        if source_tag and source_tag.get('src'):
+                            mp4_url = source_tag.get('src')
+                            logger.debug(f"Found MP4 URL for playId {play_id}: {mp4_url}")
+                            return mp4_url
+                
+                logger.debug(f"No video URL found for playId {play_id} on attempt {attempt + 1}")
+                attempt += 1
+                if attempt < max_retries:
+                    import time
+                    time.sleep(1)  # Brief wait before retry
+                    
+            except Exception as e:
+                logger.debug(f"Error extracting MP4 for playId {play_id} on attempt {attempt + 1}: {str(e)}")
+                attempt += 1
+                if attempt < max_retries:
+                    import time
+                    time.sleep(1)
+        
+        return None
     
     def _safe_get(self, row, column, default):
         """
