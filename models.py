@@ -95,9 +95,12 @@ class SwordSwing(Base):
     expert_analysis = Column(Text)
     expert_analysis_generated_at = Column(DateTime)
     
-    # Video URLs
+    # Video URLs and local storage
     video_url = Column(String(500))
     download_url = Column(String(500))
+    local_mp4_path = Column(String(500))  # Local file path for embedded video
+    mp4_downloaded = Column(Boolean, default=False)
+    mp4_file_size = Column(Integer)  # File size in bytes
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
