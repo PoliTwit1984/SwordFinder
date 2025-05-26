@@ -261,6 +261,90 @@
                                     </div>
                                     ` : ''}
                                     
+                                    <!-- Detailed Stats Section -->
+                                    <div class="mb-3">
+                                        <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#stats-${index}" aria-expanded="false">
+                                            <i class="fas fa-chart-bar me-1"></i>View Detailed Stats
+                                        </button>
+                                        <div class="collapse mt-2" id="stats-${index}">
+                                            <div class="card card-body bg-dark-subtle">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <h6 class="text-primary mb-2"><i class="fas fa-baseball me-1"></i>Pitch Details</h6>
+                                                        <div class="row g-2 small">
+                                                            <div class="col-6">
+                                                                <strong>Velocity:</strong><br>
+                                                                <span class="text-info">${swing.release_speed ? swing.release_speed + ' mph' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <strong>Spin Rate:</strong><br>
+                                                                <span class="text-info">${swing.release_spin_rate ? swing.release_spin_rate.toLocaleString() + ' rpm' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <strong>Horizontal Location:</strong><br>
+                                                                <span class="text-info">${swing.plate_x ? swing.plate_x.toFixed(2) + ' ft' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <strong>Vertical Location:</strong><br>
+                                                                <span class="text-info">${swing.plate_z ? swing.plate_z.toFixed(2) + ' ft' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <strong>Strike Zone Top:</strong><br>
+                                                                <span class="text-muted">${swing.sz_top ? swing.sz_top.toFixed(2) + ' ft' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <strong>Strike Zone Bottom:</strong><br>
+                                                                <span class="text-muted">${swing.sz_bot ? swing.sz_bot.toFixed(2) + ' ft' : 'N/A'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <h6 class="text-danger mb-2"><i class="fas fa-running me-1"></i>Swing Mechanics</h6>
+                                                        <div class="row g-2 small">
+                                                            <div class="col-6">
+                                                                <strong>Attack Angle:</strong><br>
+                                                                <span class="text-warning">${swing.attack_angle ? swing.attack_angle.toFixed(1) + '°' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <strong>Miss Distance:</strong><br>
+                                                                <span class="text-danger">${swing.intercept_ball_minus_batter_pos_y_inches ? swing.intercept_ball_minus_batter_pos_y_inches.toFixed(1) + '"' : 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <strong>Description:</strong><br>
+                                                                <span class="text-light">${swing.description || 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <strong>Event Outcome:</strong><br>
+                                                                <span class="text-light">${swing.events || 'N/A'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <h6 class="text-success mb-2"><i class="fas fa-info-circle me-1"></i>Game Context</h6>
+                                                        <div class="row g-2 small">
+                                                            <div class="col-3">
+                                                                <strong>At-Bat #:</strong><br>
+                                                                <span class="text-muted">${swing.at_bat_number || 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-3">
+                                                                <strong>Pitch #:</strong><br>
+                                                                <span class="text-muted">${swing.pitch_number || 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-3">
+                                                                <strong>Game ID:</strong><br>
+                                                                <span class="text-muted">${swing.game_pk || 'N/A'}</span>
+                                                            </div>
+                                                            <div class="col-3">
+                                                                <strong>Play ID:</strong><br>
+                                                                <span class="text-muted font-monospace">${swing.play_id ? swing.play_id.substring(0, 8) + '...' : 'N/A'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <div class="d-grid gap-2">
                                         ${swing.video_url ? `<a href="${swing.video_url}" target="_blank" class="btn btn-primary btn-sm"><i class="fas fa-play me-1"></i>Watch Video on Baseball Savant</a>` : ''}
                                         ${swing.download_url ? `<a href="${swing.download_url}" target="_blank" class="btn btn-outline-success btn-sm"><i class="fas fa-download me-1"></i>Download MP4</a>` : ''}
