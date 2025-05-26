@@ -97,61 +97,7 @@
                     </div>
                 </div>
 
-                <!-- PlayID API Tester -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h3 class="card-title mb-0"><i class="fas fa-video me-2"></i>PlayID API Tester</h3>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted">Get video URLs for specific pitches using game data</p>
-                        
-                        <form id="playIdForm">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="gamePkInput" class="form-label">Game PK</label>
-                                        <input type="number" class="form-control" id="gamePkInput" value="777796" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="inningInput" class="form-label">Inning</label>
-                                        <input type="number" class="form-control" id="inningInput" value="9" min="1" max="15" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="pitchNumberInput" class="form-label">Pitch Number</label>
-                                        <input type="number" class="form-control" id="pitchNumberInput" value="5" min="1" required>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-success" id="lookupBtn">
-                                <i class="fas fa-search me-2"></i>Get PlayID & Video
-                            </button>
-                        </form>
 
-                        <!-- PlayID Loading Spinner -->
-                        <div id="playIdLoadingSpinner" class="text-center mt-4" style="display: none;">
-                            <div class="spinner-border text-success" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2 text-muted">Looking up play data...</p>
-                        </div>
-
-                        <!-- PlayID Results -->
-                        <div id="playIdResults" class="mt-4" style="display: none;">
-                            <h5>PlayID Results</h5>
-                            <div id="playIdResultsContent"></div>
-                        </div>
-
-                        <!-- PlayID Error Display -->
-                        <div id="playIdErrorAlert" class="alert alert-danger mt-4" style="display: none;">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <span id="playIdErrorMessage"></span>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Example Response -->
                 <div class="card">
@@ -165,64 +111,35 @@
   "date": "2025-05-24",
   "data": [
     {
+      "play_id": "252064aa-13a1-3abe-9a90-f25156a519e8",
+      "game_pk": 777796,
       "player_name": "Herrin, Tim",
       "pitch_type": "CU",
+      "pitch_name": "Curveball",
+      "release_speed": 79.6,
+      "release_spin_rate": 2408,
+      "plate_x": -0.08,
+      "plate_z": 1.37,
+      "sz_top": 3.53,
+      "sz_bot": 1.65,
       "bat_speed": 34.4,
-      "intercept_y": 30.1,
       "swing_path_tilt": 46.1,
-      "sword_score": 100.0,
-      "play_id": "",
-      "game_pk": 777796,
+      "attack_angle": 18.0,
+      "intercept_ball_minus_batter_pos_y_inches": 30.1,
+      "description": "swinging_strike",
+      "events": "strikeout",
       "inning": 9,
-      "pitch_number": 5
-    },
-    {
-      "player_name": "Peterson, David",
-      "pitch_type": "CU",
-      "bat_speed": 39.8,
-      "intercept_y": 39.4,
-      "swing_path_tilt": 41.3,
-      "sword_score": 99.2,
-      "play_id": "",
-      "game_pk": 777789,
-      "inning": 3,
-      "pitch_number": 2
-    },
-    {
-      "player_name": "Helsley, Ryan",
-      "pitch_type": "SL",
-      "bat_speed": 43.5,
-      "intercept_y": 39.9,
-      "swing_path_tilt": 43.8,
-      "sword_score": 97.6,
-      "play_id": "",
-      "game_pk": 777786,
-      "inning": 9,
-      "pitch_number": 5
-    },
-    {
-      "player_name": "Valdez, Framber",
-      "pitch_type": "CU",
-      "bat_speed": 29.9,
-      "intercept_y": 34.1,
-      "swing_path_tilt": 31.3,
-      "sword_score": 97.3,
-      "play_id": "",
-      "game_pk": 777787,
-      "inning": 3,
-      "pitch_number": 3
-    },
-    {
-      "player_name": "Matthews, Zebby",
-      "pitch_type": "SL",
-      "bat_speed": 26.2,
-      "intercept_y": 19.0,
-      "swing_path_tilt": 44.0,
-      "sword_score": 97.2,
-      "play_id": "",
-      "game_pk": 777788,
-      "inning": 2,
-      "pitch_number": 4
+      "balls": 2,
+      "strikes": 2,
+      "at_bat_number": 72,
+      "pitch_number": 5,
+      "home_team": "DET",
+      "away_team": "CLE",
+      "batter": 669234,
+      "pitcher": 682120,
+      "video_url": "https://baseballsavant.mlb.com/sporty-videos?playId=252064aa-13a1-3abe-9a90-f25156a519e8",
+      "download_url": "https://sporty-clips.mlb.com/...encrypted.mp4",
+      "sword_score": 100.0
     }
   ]
 }</code></pre>
@@ -323,37 +240,66 @@
                         <i class="fas fa-trophy me-2"></i>
                         Found ${data.count} sword swing${data.count > 1 ? 's' : ''} for ${data.date}
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Player</th>
-                                    <th>Pitch Type</th>
-                                    <th>Bat Speed</th>
-                                    <th>Intercept Y</th>
-                                    <th>Swing Tilt</th>
-                                    <th>Sword Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                    <div class="row">
                 `;
                 
-                data.data.forEach(swing => {
+                data.data.forEach((swing, index) => {
+                    const rankBadge = index === 0 ? 'bg-warning text-dark' : 'bg-secondary';
                     html += `
-                        <tr>
-                            <td><strong>${swing.player_name}</strong></td>
-                            <td><span class="badge bg-secondary">${swing.pitch_type}</span></td>
-                            <td>${swing.bat_speed} mph</td>
-                            <td>${swing.intercept_y}"</td>
-                            <td>${swing.swing_path_tilt}°</td>
-                            <td><strong class="text-primary">${swing.sword_score}</strong></td>
-                        </tr>
+                        <div class="col-12 mb-4">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <span class="badge ${rankBadge} me-2">#${index + 1}</span>
+                                        ${swing.player_name} - ${swing.pitch_name}
+                                    </h5>
+                                    <h4 class="text-primary mb-0">${swing.sword_score}</h4>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted">Pitch Details</h6>
+                                            <ul class="list-unstyled">
+                                                <li><strong>Type:</strong> ${swing.pitch_name} (${swing.pitch_type})</li>
+                                                <li><strong>Speed:</strong> ${swing.release_speed || 'N/A'} mph</li>
+                                                <li><strong>Spin Rate:</strong> ${swing.release_spin_rate || 'N/A'} rpm</li>
+                                                <li><strong>Location:</strong> (${swing.plate_x || 'N/A'}, ${swing.plate_z || 'N/A'})</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted">Swing Mechanics</h6>
+                                            <ul class="list-unstyled">
+                                                <li><strong>Bat Speed:</strong> ${swing.bat_speed} mph</li>
+                                                <li><strong>Swing Path Tilt:</strong> ${swing.swing_path_tilt}°</li>
+                                                <li><strong>Attack Angle:</strong> ${swing.attack_angle || 'N/A'}°</li>
+                                                <li><strong>Intercept Y:</strong> ${swing.intercept_ball_minus_batter_pos_y_inches}"</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted">Game Context</h6>
+                                            <ul class="list-unstyled">
+                                                <li><strong>Teams:</strong> ${swing.away_team || 'N/A'} @ ${swing.home_team || 'N/A'}</li>
+                                                <li><strong>Inning:</strong> ${swing.inning} | <strong>Count:</strong> ${swing.balls || 0}-${swing.strikes || 0}</li>
+                                                <li><strong>Pitch #:</strong> ${swing.pitch_number} | <strong>Result:</strong> ${swing.description}</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-muted">Video Links</h6>
+                                            <div class="d-grid gap-2">
+                                                ${swing.video_url ? `<a href="${swing.video_url}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="fas fa-play me-1"></i>Watch Video</a>` : ''}
+                                                ${swing.download_url ? `<a href="${swing.download_url}" target="_blank" class="btn btn-outline-success btn-sm"><i class="fas fa-download me-1"></i>Download MP4</a>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     `;
                 });
                 
                 html += `
-                            </tbody>
-                        </table>
                     </div>
                 `;
                 
