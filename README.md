@@ -1,4 +1,4 @@
-https://github.com/PoliTwit1984/SwordFinder/blob/main/static/logo.png
+<img>https://github.com/PoliTwit1984/SwordFinder/blob/main/static/logo.png
 
 # SwordFinder ⚔️
 
