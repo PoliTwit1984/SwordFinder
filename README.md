@@ -1,3 +1,5 @@
+https://github.com/PoliTwit1984/SwordFinder/blob/main/static/logo.png
+
 # SwordFinder ⚔️
 
 A sophisticated Flask API that leverages MLB Statcast data to analyze and score baseball "sword swings" using advanced computational techniques and custom algorithms.
