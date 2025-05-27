@@ -1,5 +1,7 @@
 ![Logo](static/logo.png)
 
+<img src="static/logo.png" alt="Product Demo" width="250"/>
+
 # SwordFinder ⚔️
 
 A sophisticated Flask API that leverages MLB Statcast data to analyze and score baseball "sword swings" using advanced computational techniques and custom algorithms.
