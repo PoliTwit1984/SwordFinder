@@ -200,7 +200,8 @@ class SwordSwing(Base):
     pitch_id = Column(Integer, ForeignKey('statcast_pitches.id'))
     
     # Sword scoring
-    sword_score = Column(Float)
+    sword_score = Column(Float) # This is the universally scaled score (e.g., 50-100)
+    raw_sword_metric = Column(Float) # The raw sum of weighted components, before 50-100 scaling
     is_sword_swing = Column(Boolean, default=True)
     
     # Analysis results

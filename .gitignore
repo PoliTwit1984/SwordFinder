@@ -45,6 +45,7 @@ instance/
 *.sqlite3
 
 # Large CSV files (keep complete dataset local)
+*.csv
 complete_statcast_2025.csv
 full_statcast_*.csv
 swords_chunk*.csv

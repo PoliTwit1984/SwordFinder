@@ -11,7 +11,8 @@ from bs4 import BeautifulSoup
 from pybaseball import statcast
 from sqlalchemy import create_engine, text
 from simple_db_swordfinder import SimpleDatabaseSwordFinder
-from models_complete import create_tables
+from models_complete import create_tables, get_db, SwordSwing, StatcastPitch
+from video_downloader import process_sword_videos, get_download_stats, download_sword_clip, get_video_url_from_sporty_page
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -22,7 +23,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 
 # Initialize database tables
-create_tables()
+# create_tables()  # Tables already exist in local database
 
 # Initialize database-powered sword finder with your authentic MLB data
 db_sword_finder = SimpleDatabaseSwordFinder()  # Uses your 226,833 authentic records
@@ -47,54 +48,6 @@ def force_https():
         'localhost' not in request.host and 
         '127.0.0.1' not in request.host):
         return redirect(request.url.replace('http://', 'https://'), code=301)
-
-def get_video_url_from_sporty_page(play_id, max_retries=3):
-    """
-    Extract the direct MP4 download URL from a Baseball Savant sporty-videos page
-    Based on proven solution from GitHub
-    
-    Args:
-        play_id (str): The UUID playId for the pitch
-        max_retries (int): Number of retry attempts
-        
-    Returns:
-        str: Direct MP4 URL if found, None otherwise
-    """
-    attempt = 0
-    while attempt < max_retries:
-        try:
-            page_url = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
-            logger.debug(f"Extracting MP4 from: {page_url} (attempt {attempt + 1})")
-            
-            response = requests.get(page_url, timeout=15)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            video_container = soup.find('div', class_='video-box')
-            
-            if video_container:
-                video_tag = video_container.find('video')
-                if video_tag:
-                    source_tag = video_tag.find('source', {'type': 'video/mp4'})
-                    if source_tag and source_tag.get('src'):
-                        mp4_url = source_tag.get('src')
-                        logger.info(f"Found MP4 URL for playId {play_id}: {mp4_url}")
-                        return mp4_url
-            
-            logger.warning(f"No video URL found for playId {play_id} on attempt {attempt + 1}")
-            attempt += 1
-            if attempt < max_retries:
-                import time
-                time.sleep(2)  # Wait before retry
-                
-        except Exception as e:
-            logger.warning(f"Error extracting MP4 from sporty page for playId {play_id} on attempt {attempt + 1}: {str(e)}")
-            attempt += 1
-            if attempt < max_retries:
-                import time
-                time.sleep(2)
-    
-    return None
 
 def get_best_video_url(play_id):
     """
@@ -209,12 +162,196 @@ def find_swords():
         
         # Use database-powered version with complete authentic MLB data
         result = db_sword_finder.find_sword_swings(date_str)
-        sword_swings = result.get('data', [])
+        swords_from_finder = result.get('data', []) # Renamed to avoid confusion
+        
+        # Ensure SwordSwing records exist or are created for these swords
+        # This list will hold the sword dictionaries that are passed to the video download loop and final response
+        sword_dicts_for_processing = [] 
+
+        with get_db() as db_session:
+            for temp_sword_dict in swords_from_finder:
+                statcast_pitch_id = temp_sword_dict.get('statcast_pitch_db_id')
+                current_sword_score = temp_sword_dict.get('sword_score')
+
+                if not statcast_pitch_id:
+                    logger.warning("Sword data from finder missing statcast_pitch_db_id. Skipping SwordSwing table interaction.")
+                    sword_dicts_for_processing.append(temp_sword_dict) # Add to list for response
+                    continue
+
+                sword_swing_orm_record = db_session.query(SwordSwing).filter(SwordSwing.pitch_id == statcast_pitch_id).first()
+
+                if not sword_swing_orm_record:
+                    logger.info(f"Creating new SwordSwing record for pitch_id {statcast_pitch_id} with score {current_sword_score}")
+                    sword_swing_orm_record = SwordSwing(
+                        pitch_id=statcast_pitch_id,
+                        sword_score=current_sword_score, # This is the universally scaled score
+                        raw_sword_metric=temp_sword_dict.get('raw_sword_metric'), # Store the raw metric
+                        is_sword_swing=True
+                    )
+                    db_session.add(sword_swing_orm_record)
+                    try:
+                        db_session.commit() # Commit new SwordSwing record
+                    except Exception as e:
+                        db_session.rollback()
+                        logger.error(f"Error creating SwordSwing for pitch_id {statcast_pitch_id}: {e}")
+                        sword_dicts_for_processing.append(temp_sword_dict) 
+                        continue 
+                else: # SwordSwing record exists, update it
+                    if sword_swing_orm_record.sword_score != current_sword_score:
+                        logger.info(f"Updating sword_score for existing SwordSwing pitch_id {statcast_pitch_id} from {sword_swing_orm_record.sword_score} to {current_sword_score}")
+                        sword_swing_orm_record.sword_score = current_sword_score
+                    
+                    # Also update raw_sword_metric if it's different or not set
+                    # (assuming raw_sword_metric from finder is the source of truth for this request)
+                    new_raw_metric = temp_sword_dict.get('raw_sword_metric')
+                    if sword_swing_orm_record.raw_sword_metric != new_raw_metric and new_raw_metric is not None:
+                        logger.info(f"Updating raw_sword_metric for existing SwordSwing pitch_id {statcast_pitch_id} from {sword_swing_orm_record.raw_sword_metric} to {new_raw_metric}")
+                        sword_swing_orm_record.raw_sword_metric = new_raw_metric
+                    
+                    try:
+                        # Only commit if there were changes to sword_score or raw_sword_metric
+                        if db_session.is_modified(sword_swing_orm_record):
+                            db_session.commit() 
+                    except Exception as e:
+                        db_session.rollback()
+                        logger.error(f"Error updating score/raw_metric for SwordSwing pitch_id {statcast_pitch_id}: {e}")
+                
+                sword_dicts_for_processing.append(temp_sword_dict) # This dict goes to video processing and response
+
+        # Batter name lookup and Video processing loop
+        for i, sword_dict_for_response in enumerate(sword_dicts_for_processing[:5]):  # Only process top 5
+            
+            # Fetch Batter Name using batter_id
+            batter_mlbam_id = sword_dict_for_response.get('batter_id')
+            batter_name_str = f"Batter ID: {batter_mlbam_id}" # Default
+            if batter_mlbam_id:
+                try:
+                    api_url = f"https://statsapi.mlb.com/api/v1/people/{batter_mlbam_id}"
+                    response = requests.get(api_url, timeout=5)
+                    response.raise_for_status()
+                    batter_data = response.json()
+                    if batter_data.get("people") and len(batter_data["people"]) > 0:
+                        batter_name_str = batter_data["people"][0].get("fullName", batter_name_str)
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"Could not fetch batter name for ID {batter_mlbam_id}: {e}")
+                except ValueError: 
+                    logger.warning(f"Could not parse JSON for batter ID {batter_mlbam_id}")
+            sword_dict_for_response['batter_name'] = batter_name_str
+
+            # Video processing logic starts here
+            play_id = sword_dict_for_response.get('play_id') # play_id from simple_db_swordfinder (might be None)
+            
+            # If no play_id from simple_db_swordfinder, try to look it up using MLB Stats API
+            # Use sword_dict_for_response here instead of undefined 'sword'
+            if not play_id and sword_dict_for_response.get('game_pk') and sword_dict_for_response.get('inning') and sword_dict_for_response.get('pitch_number'):
+                logger.info(f"Looking up playId for game {sword_dict_for_response['game_pk']}, inning {sword_dict_for_response['inning']}, pitch {sword_dict_for_response['pitch_number']}")
+                
+                try:
+                    # Use MLB Stats API to get play ID
+                    mlb_api_url = f"https://statsapi.mlb.com/api/v1.1/game/{sword_dict_for_response['game_pk']}/feed/live"
+                    response = requests.get(mlb_api_url, timeout=10)
+                    
+                    if response.status_code == 200:
+                        game_data = response.json()
+                        all_plays = game_data['liveData']['plays']['allPlays']
+                        
+                        # Search for matching pitch using at-bat number
+                        at_bat_counter = 0
+                        for play in all_plays:
+                            at_bat_counter += 1
+                            
+                            # Match by at-bat number
+                            if at_bat_counter == sword_dict_for_response['at_bat_number']: # Use sword_dict_for_response
+                                for event in play.get('playEvents', []):
+                                    if event.get('pitchNumber') == sword_dict_for_response['pitch_number']: # Use sword_dict_for_response
+                                        # Verify it's a swinging strike
+                                        description = event.get('details', {}).get('description', '')
+                                        if 'swinging' in description.lower():
+                                            # Found it! Get the UUID play ID
+                                            play_id_from_api = ( # Use a temporary variable
+                                                event.get('playId') or
+                                                event.get('uuid') or
+                                                event.get('guid') or
+                                                play.get('playId') or
+                                                play.get('about', {}).get('playId')
+                                            )
+                                            
+                                            if play_id_from_api: # play_id is updated here if found
+                                                logger.info(f"Found playId for at-bat {sword_dict_for_response['at_bat_number']}, pitch {sword_dict_for_response['pitch_number']}: {play_id_from_api}")
+                                                sword_dict_for_response['play_id'] = play_id_from_api # Update the dict that goes into the response
+                                                play_id = play_id_from_api # Update the local play_id variable for this iteration
+                                                break
+                                
+                                if play_id_from_api: # Check the temp variable
+                                    break 
+                                    
+                except Exception as e:
+                    logger.warning(f"Failed to lookup playId: {str(e)}")
+            
+            # After play_id is potentially updated in sword_dict_for_response, construct its video_url
+            if play_id and isinstance(play_id, str) and play_id.strip():
+                sword_dict_for_response['video_url'] = f"https://baseballsavant.mlb.com/sporty-videos?playId={play_id.strip()}&videoType=AWAY"
+            else:
+                sword_dict_for_response['video_url'] = None
+
+            # Now try to download video if we have a valid play_id (either from simple_db_swordfinder or MLB API lookup)
+            if play_id and not sword_dict_for_response.get('local_path'): 
+                try:
+                    download_url = get_video_url_from_sporty_page(play_id)
+                    
+                    if download_url:
+                        video_download_outcome = download_sword_clip(play_id, download_url)
+                        
+                        if video_download_outcome:
+                            sword_dict_for_response['local_mp4_path'] = video_download_outcome['path'].lstrip('/')
+                            sword_dict_for_response['mp4_downloaded'] = True
+                            
+                            # Store in database using the SwordSwing ORM record
+                            # Re-fetch the SwordSwing record within a new session scope for this update
+                            with get_db() as db_session_update:
+                                statcast_pitch_id_for_update = sword_dict_for_response.get('statcast_pitch_db_id')
+                                if statcast_pitch_id_for_update:
+                                    sword_swing_to_update = db_session_update.query(SwordSwing).filter(SwordSwing.pitch_id == statcast_pitch_id_for_update).first()
+                                    if sword_swing_to_update:
+                                        sword_swing_to_update.local_mp4_path = video_download_outcome['path']
+                                        sword_swing_to_update.mp4_downloaded = True
+                                        sword_swing_to_update.download_url = download_url # Direct MP4 link
+                                        # Also save the Savant page video_url that was constructed for the API response
+                                        if sword_dict_for_response.get('video_url'):
+                                            sword_swing_to_update.video_url = sword_dict_for_response['video_url']
+                                        
+                                        sword_swing_to_update.updated_at = datetime.utcnow()
+                                        try:
+                                            db_session_update.commit()
+                                            logger.info(f"Updated SwordSwing record for pitch_id {statcast_pitch_id_for_update} with video path.")
+                                        except Exception as db_err_update:
+                                            db_session_update.rollback()
+                                            logger.error(f"Error committing video path update for SwordSwing pitch_id {statcast_pitch_id_for_update}: {db_err_update}")
+                                    else:
+                                        # This should ideally not happen if the creation step above worked
+                                        logger.warning(f"Could not find SwordSwing record for pitch_id {statcast_pitch_id_for_update} during video path update.")
+                                else:
+                                    logger.warning(f"Missing statcast_pitch_db_id in sword data for play_id {play_id}, cannot update SwordSwing video path.")
+                            
+                            logger.info(f"Downloaded video {i+1}/5 for {date_str}: {play_id}")
+                        else:
+                            logger.warning(f"Failed to download video for {play_id}")
+                            sword_dict_for_response['mp4_downloaded'] = False
+                    else:
+                        logger.warning(f"No download URL found for {play_id}")
+                        sword_dict_for_response['mp4_downloaded'] = False
+                        
+                except Exception as e:
+                    logger.error(f"Error downloading video for {play_id}: {str(e)}")
+                    sword_dict_for_response['mp4_downloaded'] = False
+            elif sword_dict_for_response.get('local_path'): 
+                sword_dict_for_response['local_mp4_path'] = sword_dict_for_response['local_path'].lstrip('/')
+                sword_dict_for_response['mp4_downloaded'] = True
         
         return jsonify({
             "success": True,
-            "data": sword_swings,
-            "count": len(sword_swings),
+            "data": sword_dicts_for_processing, # Use the list that was iterated over
+            "count": len(sword_dicts_for_processing),
             "date": date_str
         })
         
@@ -412,6 +549,163 @@ def health_check():
         "service": "SwordFinder API",
         "version": "1.0.0"
     })
+
+@app.route('/download-videos/<date>', methods=['POST'])
+def download_videos_for_date(date):
+    """
+    Download videos for sword swings on a specific date
+    Used to pre-download videos if needed
+    """
+    try:
+        # Get sword swings for the date
+        result = db_sword_finder.find_sword_swings(date)
+        sword_swings = result.get('data', [])[:5]  # Top 5 only
+        
+        download_results = {
+            "date": date,
+            "processed": 0,
+            "downloaded": 0,
+            "failed": 0,
+            "videos": []
+        }
+        
+        for sword in sword_swings:
+            play_id = sword.get('play_id')
+            download_results["processed"] += 1
+            
+            if play_id:
+                try:
+                    # Get and download the video
+                    download_url = get_video_url_from_sporty_page(play_id)
+                    if download_url:
+                        result = download_sword_clip(play_id, download_url)
+                        if result:
+                            download_results["downloaded"] += 1
+                            download_results["videos"].append({
+                                "play_id": play_id,
+                                "player": sword.get('player_name'),
+                                "path": result['path'],
+                                "size": result['file_size']
+                            })
+                        else:
+                            download_results["failed"] += 1
+                    else:
+                        download_results["failed"] += 1
+                except Exception as e:
+                    download_results["failed"] += 1
+                    logger.error(f"Error downloading video {play_id}: {str(e)}")
+        
+        return jsonify({
+            "success": True,
+            "results": download_results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/video-stats', methods=['GET'])
+def video_stats():
+    """Get statistics about downloaded videos"""
+    try:
+        stats = get_download_stats()
+        
+        # Add directory info
+        video_dir = "static/videos"
+        if os.path.exists(video_dir):
+            video_files = [f for f in os.listdir(video_dir) if f.endswith('.mp4')]
+            stats["video_files_on_disk"] = len(video_files)
+        else:
+            stats["video_files_on_disk"] = 0
+            
+        return jsonify({
+            "success": True,
+            "stats": stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/top-swords-2025', methods=['GET'])
+def get_top_swords_for_2025():
+    """
+    API endpoint to get the top 5 sword swings for the year 2025,
+    ordered by raw_sword_metric.
+    """
+    logger.info("Fetching top 5 swords for 2025")
+    top_swords_list = []
+    try:
+        with get_db() as db_session:
+            # Query to get top 5 swords for 2025 by raw_sword_metric
+            # Ensure game_date is treated as string for comparison if it's VARCHAR
+            query = text("""
+                SELECT 
+                    ss.id as sword_swing_id,
+                    ss.raw_sword_metric, 
+                    ss.sword_score, 
+                    ss.video_url, 
+                    ss.local_mp4_path, 
+                    ss.mp4_downloaded,
+                    sp.game_date, 
+                    sp.player_name as pitcher_name, 
+                    sp.batter as batter_id, 
+                    sp.pitch_type, 
+                    sp.pitch_name as descriptive_pitch_name, 
+                    sp.release_speed,
+                    sp.inning, 
+                    sp.inning_topbot, 
+                    sp.home_team, 
+                    sp.away_team,
+                    sp.description as pitch_description,
+                    ss.pitch_id as statcast_pitch_db_id
+                FROM sword_swings ss
+                JOIN statcast_pitches sp ON ss.pitch_id = sp.id
+                WHERE (sp.game_date LIKE '2025-%' OR (sp.game_date >= '2025-01-01' AND sp.game_date <= '2025-12-31'))
+                  AND ss.raw_sword_metric IS NOT NULL
+                ORDER BY ss.raw_sword_metric DESC
+                LIMIT 5
+            """)
+            
+            result = db_session.execute(query)
+            raw_top_swords = result.mappings().all() # Get results as list of dict-like objects
+
+            for sword_data_db in raw_top_swords:
+                item = dict(sword_data_db) # Convert to mutable dict
+
+                # Fetch Batter Name
+                batter_mlbam_id = item.get('batter_id')
+                batter_name_str = f"Batter ID: {batter_mlbam_id}" 
+                if batter_mlbam_id:
+                    try:
+                        api_url = f"https://statsapi.mlb.com/api/v1/people/{batter_mlbam_id}"
+                        response = requests.get(api_url, timeout=5)
+                        response.raise_for_status()
+                        batter_api_data = response.json()
+                        if batter_api_data.get("people") and len(batter_api_data["people"]) > 0:
+                            batter_name_str = batter_api_data["people"][0].get("fullName", batter_name_str)
+                    except requests.exceptions.RequestException as e_batter:
+                        logger.warning(f"Could not fetch batter name for ID {batter_mlbam_id}: {e_batter}")
+                    except ValueError: 
+                        logger.warning(f"Could not parse JSON for batter ID {batter_mlbam_id}")
+                item['batter_name'] = batter_name_str
+
+                # Adjust local_mp4_path to be web-accessible
+                if item.get('local_mp4_path'):
+                    item['local_mp4_path'] = item['local_mp4_path'].lstrip('/')
+                
+                top_swords_list.append(item)
+        
+        return jsonify({"success": True, "data": top_swords_list, "count": len(top_swords_list)})
+
+    except Exception as e:
+        logger.error(f"Error in /api/top-swords-2025: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({"success": False, "error": f"Internal server error: {str(e)}"}), 500
 
 @app.route('/patch-monitor', methods=['GET'])
 def patch_monitor():
@@ -935,4 +1229,4 @@ def method_not_allowed(error):
     }), 405
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
