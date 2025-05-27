@@ -1,4 +1,4 @@
-![Logo](main/static/logo.png)
+![Logo](static/logo.png)
 
 # SwordFinder ⚔️
 
