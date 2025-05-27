@@ -1,5 +1,3 @@
-![Logo](static/logo.png)
-
 <img src="static/logo.png" alt="Product Demo" width="250"/>
 
 # SwordFinder ⚔️
