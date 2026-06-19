@@ -1,6 +1,44 @@
 const INTRO_STORAGE_KEY = 'swordfinder:intro:v3';
 let introMounted = false;
 
+const THEME_STORAGE_KEY = 'swordfinder:theme:v1';
+const DEFAULT_THEME = 'red';
+export const THEMES = [
+  { id: 'red', label: 'Sword Red' },
+  { id: 'blue', label: 'Diamond Blue' },
+  { id: 'green', label: 'Outfield Green' },
+  { id: 'gold', label: 'Bullpen Gold' },
+  { id: 'purple', label: 'Midnight Purple' },
+];
+
+function isKnownTheme(id) {
+  return THEMES.some((theme) => theme.id === id);
+}
+
+export function getStoredTheme() {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return isKnownTheme(stored) ? stored : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+export function applyTheme(id) {
+  const theme = isKnownTheme(id) ? id : DEFAULT_THEME;
+  document.documentElement.setAttribute('data-theme', theme);
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // If storage is blocked, the theme still applies for this page view.
+  }
+  return theme;
+}
+
+// Apply the saved theme as soon as this module evaluates so the palette is set
+// before the nav (and the rest of the page) is mounted, avoiding a color flash.
+applyTheme(getStoredTheme());
+
 function hasSeenIntro() {
   try {
     return window.localStorage.getItem(INTRO_STORAGE_KEY) === 'seen';
@@ -93,9 +131,23 @@ export function mountNav(active = 'home') {
         <a class="app-link ${active === 'info' ? 'active' : ''}" href="/sword-info.html">Info</a>
         <a class="app-link ${active === 'leaderboards' ? 'active' : ''}" href="/leaderboards.html"><span class="nav-label-full">Leaderboards</span><span class="nav-label-short">Boards</span></a>
         <a class="app-link ${active === 'ops' ? 'active' : ''}" href="/ops.html">Ops</a>
+        <label class="theme-picker">
+          <span class="sr-only">Color theme</span>
+          <select id="theme-select" class="theme-select" aria-label="Color theme">
+            ${THEMES.map((theme) => `<option value="${theme.id}">${theme.label}</option>`).join('')}
+          </select>
+        </label>
       </div>
     </div>
   `;
+
+  const themeSelect = nav.querySelector('#theme-select');
+  if (themeSelect) {
+    themeSelect.value = getStoredTheme();
+    themeSelect.addEventListener('change', (event) => {
+      applyTheme(event.target.value);
+    });
+  }
 
   if (active !== 'ops') {
     mountFirstVisitIntro();
