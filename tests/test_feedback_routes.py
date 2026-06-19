@@ -190,3 +190,47 @@ def test_admin_update_missing_item_returns_404(client):
         "/feedback/999/status", headers=ADMIN_HEADERS, json={"status": "planned"}
     )
     assert response.status_code == 404
+
+
+class _MissingTableQuery(_FakeQuery):
+    def execute(self):
+        raise Exception(
+            "{'message': 'relation \"public.feedback\" does not exist', 'code': '42P01'}"
+        )
+
+
+class _MissingTable(_FakeTable):
+    def table(self, _name):
+        return _MissingTableQuery(self)
+
+
+@pytest.fixture
+def missing_table_client(monkeypatch):
+    route.configure_feedback_dependencies(
+        supabase=_MissingTable(),
+        rate_limiter=fb.RateLimiter(fb.FEEDBACK_RATE_LIMIT_MAX, fb.FEEDBACK_RATE_LIMIT_WINDOW_SECONDS),
+    )
+    monkeypatch.setattr(fb, "admin_token", lambda: ADMIN_TOKEN)
+    return TestClient(api.app)
+
+
+def test_roadmap_degrades_to_empty_when_table_missing(missing_table_client):
+    response = missing_table_client.get("/feedback/roadmap")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["counts"] == {"planned": 0, "shipped": 0, "rejected": 0}
+
+
+def test_submit_reports_storage_unavailable_when_table_missing(missing_table_client):
+    response = missing_table_client.post(
+        "/feedback", json={"request_type": "bug", "message": "broken"}
+    )
+    assert response.status_code == 503
+    # The raw Postgres error is not leaked to the client.
+    assert "42P01" not in response.text
+    assert "does not exist" not in response.text
+
+
+def test_admin_list_reports_storage_unavailable_when_table_missing(missing_table_client):
+    response = missing_table_client.get("/feedback/admin", headers=ADMIN_HEADERS)
+    assert response.status_code == 503

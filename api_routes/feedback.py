@@ -49,6 +49,19 @@ def _require_supabase():
     return _supabase
 
 
+# Message shown to clients before create_feedback_table.sql has been applied,
+# instead of leaking the raw Postgres "relation does not exist" error.
+STORAGE_UNAVAILABLE_DETAIL = (
+    "Feedback storage is not set up yet. Apply create_feedback_table.sql."
+)
+
+
+def _is_missing_table_error(exc: Exception) -> bool:
+    """True when the failure is the feedback table not existing yet (PG 42P01)."""
+    text = str(exc).lower()
+    return "42p01" in text or "does not exist" in text
+
+
 @router.post("")
 async def submit_feedback(request: Request, submission: fb.FeedbackSubmission):
     """Accept a feature request or bug report from any page."""
@@ -70,6 +83,8 @@ async def submit_feedback(request: Request, submission: fb.FeedbackSubmission):
     try:
         result = supabase.table(FEEDBACK_TABLE).insert(record).execute()
     except Exception as exc:
+        if _is_missing_table_error(exc):
+            raise HTTPException(status_code=503, detail=STORAGE_UNAVAILABLE_DETAIL)
         raise HTTPException(status_code=500, detail=str(exc))
 
     inserted = (result.data or [{}])[0]
@@ -97,7 +112,12 @@ async def get_roadmap(limit: int = 200):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Before the migration is applied the roadmap simply has nothing to show,
+        # so render empty groups rather than a 500 on the public page.
+        if _is_missing_table_error(exc):
+            result = type("Empty", (), {"data": []})()
+        else:
+            raise HTTPException(status_code=500, detail=str(exc))
 
     groups = fb.group_roadmap(result.data or [])
     return {
@@ -121,6 +141,8 @@ async def list_feedback(request: Request, status: Optional[str] = None, limit: i
     try:
         result = query.order("created_at", desc=True).limit(limit).execute()
     except Exception as exc:
+        if _is_missing_table_error(exc):
+            raise HTTPException(status_code=503, detail=STORAGE_UNAVAILABLE_DETAIL)
         raise HTTPException(status_code=500, detail=str(exc))
 
     rows = result.data or []
@@ -152,6 +174,8 @@ async def update_feedback_status(
             .execute()
         )
     except Exception as exc:
+        if _is_missing_table_error(exc):
+            raise HTTPException(status_code=503, detail=STORAGE_UNAVAILABLE_DETAIL)
         raise HTTPException(status_code=500, detail=str(exc))
 
     rows = result.data or []
