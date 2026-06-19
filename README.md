@@ -42,6 +42,7 @@ The important product rule is **No K, no sword**. A hitter can look terrible on 
 - **Sword Info page** with the term explainer, embedded source videos, and replayable first-visit onboarding.
 - **Ops dashboard** with Railway API health, Supabase/Azure/GitHub/Vercel architecture, video backlog status, and run commands.
 - **X sharing support** for operator-gated post drafts and optional native video upload.
+- **In-app feedback and public roadmap** with a floating Feedback launcher on every page, server-validated submissions (length caps, honeypot, per-IP rate limiting), a public roadmap of planned/shipped/rejected items, and admin-token feedback triage in the Ops UI.
 
 ## How It Works
 

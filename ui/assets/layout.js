@@ -1,3 +1,5 @@
+import { mountFeedbackLauncher } from './feedback.js';
+
 const INTRO_STORAGE_KEY = 'swordfinder:intro:v3';
 let introMounted = false;
 
@@ -117,6 +119,10 @@ export function mountFirstVisitIntro(options = {}) {
 }
 
 export function mountNav(active = 'home') {
+  // The Feedback launcher is shared chrome: mount it on every page that renders
+  // the nav, before any early return so it is always available.
+  mountFeedbackLauncher();
+
   const nav = document.getElementById('top-nav');
   if (!nav) return;
 
@@ -130,6 +136,7 @@ export function mountNav(active = 'home') {
         <a class="app-link ${active === 'home' ? 'active' : ''}" href="/index.html">Home</a>
         <a class="app-link ${active === 'info' ? 'active' : ''}" href="/sword-info.html">Info</a>
         <a class="app-link ${active === 'leaderboards' ? 'active' : ''}" href="/leaderboards.html"><span class="nav-label-full">Leaderboards</span><span class="nav-label-short">Boards</span></a>
+        <a class="app-link ${active === 'roadmap' ? 'active' : ''}" href="/roadmap.html"><span class="nav-label-full">Roadmap</span><span class="nav-label-short">Plan</span></a>
         <a class="app-link ${active === 'ops' ? 'active' : ''}" href="/ops.html">Ops</a>
         <label class="theme-picker">
           <span class="sr-only">Color theme</span>
