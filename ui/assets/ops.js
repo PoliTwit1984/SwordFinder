@@ -1,5 +1,6 @@
 import {
   escapeHtml,
+  fetchApiJson,
   fetchCount,
   fetchOpsJson,
   fetchRows,
@@ -213,3 +214,179 @@ async function init() {
 }
 
 init();
+
+// --- Feedback inbox (admin token gated) -------------------------------------
+const FEEDBACK_TOKEN_KEY = 'swordfinder:admin-token';
+
+const feedbackTokenInput = document.getElementById('feedback-admin-token');
+const feedbackStatusFilter = document.getElementById('feedback-status-filter');
+const feedbackLoadButton = document.getElementById('feedback-load');
+const feedbackAdminStatus = document.getElementById('feedback-admin-status');
+const feedbackAdminList = document.getElementById('feedback-admin-list');
+const feedbackAdminEmpty = document.getElementById('feedback-admin-empty');
+const feedbackAdminPill = document.getElementById('feedback-admin-pill');
+
+const feedbackReviewEnabled = Boolean(
+  feedbackTokenInput &&
+  feedbackStatusFilter &&
+  feedbackLoadButton &&
+  feedbackAdminStatus &&
+  feedbackAdminList &&
+  feedbackAdminEmpty &&
+  feedbackAdminPill
+);
+
+function adminToken() {
+  return (feedbackTokenInput.value || '').trim();
+}
+
+function authHeaders() {
+  return { Authorization: `Bearer ${adminToken()}` };
+}
+
+function setFeedbackStatus(message, isError = false) {
+  feedbackAdminStatus.textContent = message;
+  feedbackAdminStatus.classList.toggle('text-red-400', isError);
+}
+
+function setAdminPill(text, good) {
+  feedbackAdminPill.textContent = text;
+  feedbackAdminPill.classList.toggle('is-good', Boolean(good));
+  feedbackAdminPill.classList.toggle('is-bad', good === false);
+}
+
+function feedbackCardTemplate(row) {
+  const created = formatApiTimestamp(row.created_at);
+  const email = row.contact_email
+    ? `<a class="feedback-inline-link" href="mailto:${escapeHtml(row.contact_email)}">${escapeHtml(row.contact_email)}</a>`
+    : '<span class="text-zinc-600">no email</span>';
+  const context = row.page_path ? escapeHtml(row.page_path) : '—';
+  const reason = row.rejection_reason
+    ? `<p class="mt-1 text-xs text-zinc-400">Reason: ${escapeHtml(row.rejection_reason)}</p>`
+    : '';
+
+  return `
+    <div class="feedback-admin-card" data-feedback-id="${escapeHtml(String(row.id))}">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="roadmap-tag roadmap-tag-${escapeHtml(row.request_type || 'feature')}">${escapeHtml(row.request_type === 'bug' ? 'Bug' : 'Feature')}</span>
+          <span class="status-pill">${escapeHtml(row.status || 'new')}</span>
+        </div>
+        <p class="text-xs text-zinc-500">#${escapeHtml(String(row.id))} · ${escapeHtml(created)}</p>
+      </div>
+      <p class="mt-2 text-sm text-zinc-200">${escapeHtml(row.message || '')}</p>
+      ${reason}
+      <p class="mt-2 text-xs text-zinc-500">Page: ${context} · Theme: ${escapeHtml(row.theme || '—')} · ${email}</p>
+      <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
+        <input class="ops-date-input min-w-0 feedback-reason-input" type="text" maxlength="1000" placeholder="Rejection reason (required to reject)" />
+        <button class="secondary rounded-md px-3 py-2 text-xs uppercase tracking-[0.08em]" data-feedback-action="planned">Plan</button>
+        <button class="secondary rounded-md px-3 py-2 text-xs uppercase tracking-[0.08em]" data-feedback-action="shipped">Ship</button>
+        <button class="secondary rounded-md px-3 py-2 text-xs uppercase tracking-[0.08em]" data-feedback-action="rejected">Reject</button>
+      </div>
+    </div>
+  `;
+}
+
+async function updateFeedbackStatus(card, status) {
+  const id = card.getAttribute('data-feedback-id');
+  const reason = card.querySelector('.feedback-reason-input')?.value.trim() || '';
+  if (status === 'rejected' && !reason) {
+    setFeedbackStatus('A rejection reason is required to reject feedback.', true);
+    card.querySelector('.feedback-reason-input')?.focus();
+    return;
+  }
+
+  if (!adminToken()) {
+    setFeedbackStatus('Enter the admin token first.', true);
+    return;
+  }
+
+  const buttons = card.querySelectorAll('button[data-feedback-action]');
+  buttons.forEach((button) => { button.disabled = true; });
+
+  try {
+    const body = { status };
+    if (status === 'rejected') body.rejection_reason = reason;
+    await fetchApiJson(`/feedback/${encodeURIComponent(id)}/status`, {}, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    setFeedbackStatus(`Feedback #${id} marked ${status}.`);
+    await loadFeedback();
+  } catch (error) {
+    console.error(error);
+    setFeedbackStatus(`Could not update #${id}: ${error.message}`, true);
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
+function renderFeedback(rows) {
+  if (!rows.length) {
+    feedbackAdminList.innerHTML = '';
+    feedbackAdminEmpty.classList.remove('hidden');
+    return;
+  }
+  feedbackAdminEmpty.classList.add('hidden');
+  feedbackAdminList.innerHTML = rows.map(feedbackCardTemplate).join('');
+  feedbackAdminList.querySelectorAll('button[data-feedback-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const card = button.closest('.feedback-admin-card');
+      updateFeedbackStatus(card, button.getAttribute('data-feedback-action'));
+    });
+  });
+}
+
+async function loadFeedback() {
+  if (!adminToken()) {
+    setFeedbackStatus('Enter the admin token to load feedback.', true);
+    setAdminPill('Token required', false);
+    return;
+  }
+
+  feedbackLoadButton.disabled = true;
+  feedbackLoadButton.textContent = 'Loading';
+  setFeedbackStatus('Loading feedback…');
+
+  try {
+    const statusValue = feedbackStatusFilter.value;
+    const data = await fetchApiJson('/feedback/admin', statusValue ? { status: statusValue } : {}, {
+      headers: authHeaders(),
+    });
+    try {
+      window.sessionStorage.setItem(FEEDBACK_TOKEN_KEY, adminToken());
+    } catch {
+      // Session storage may be blocked; loading still worked for this view.
+    }
+    renderFeedback(data.rows || []);
+    setAdminPill('Authorized', true);
+    setFeedbackStatus(`${data.count || 0} item${(data.count || 0) === 1 ? '' : 's'} loaded.`);
+  } catch (error) {
+    console.error(error);
+    setAdminPill('Token rejected', false);
+    setFeedbackStatus(`Feedback load failed: ${error.message}`, true);
+  } finally {
+    feedbackLoadButton.disabled = false;
+    feedbackLoadButton.textContent = 'Load Feedback';
+  }
+}
+
+if (feedbackReviewEnabled) {
+  try {
+    const savedToken = window.sessionStorage.getItem(FEEDBACK_TOKEN_KEY);
+    if (savedToken) feedbackTokenInput.value = savedToken;
+  } catch {
+    // Ignore storage access errors.
+  }
+
+  feedbackLoadButton.addEventListener('click', loadFeedback);
+  feedbackStatusFilter.addEventListener('change', () => {
+    if (adminToken()) loadFeedback();
+  });
+  feedbackTokenInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      loadFeedback();
+    }
+  });
+}

@@ -600,6 +600,15 @@ configure_share_x_dependencies(
 app.include_router(share_x_router)
 
 
+from api_routes.feedback import (
+    configure_feedback_dependencies,
+    router as feedback_router,
+)
+
+configure_feedback_dependencies(supabase=supabase)
+app.include_router(feedback_router)
+
+
 @app.get("/ops/video-backlog")
 async def get_video_backlog(date: Optional[str] = None, limit: int = 50):
     """List pending sword video cache rows."""
