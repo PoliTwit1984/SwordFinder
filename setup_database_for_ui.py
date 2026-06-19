@@ -6,6 +6,7 @@ Guides through adding missing columns and populating data
 
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 def main():
@@ -34,7 +35,8 @@ def main():
     print("Please run the following SQL in your Supabase SQL Editor:")
     print("👉 https://app.supabase.com/project/seagurfpitfslyxxxztw/sql/new\n")
     
-    with open('add_missing_columns.sql', 'r') as f:
+    sql_path = Path(__file__).resolve().parent / "scripts" / "migration" / "add_missing_columns.sql"
+    with open(sql_path, 'r') as f:
         print(f.read())
     
     input("\n✅ Press Enter after running the SQL above...")

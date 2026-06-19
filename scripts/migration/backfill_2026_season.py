@@ -7,12 +7,19 @@ Default behavior targets the current season from opening day through yesterday.
 
 import argparse
 import logging
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 from pybaseball import statcast
 from dotenv import load_dotenv
 from supabase import create_client
+
+# This script lives in scripts/migration/ but imports modules from the repo
+# root (daily_update, env_config). Ensure the repo root is importable so the
+# script remains runnable standalone: `python scripts/migration/backfill_2026_season.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from daily_update import (
     calculate_perceived_velocity_simple,

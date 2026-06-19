@@ -1,4 +1,7 @@
-from backfill_daily_slate_videos import build_daily_backfill_summary, filter_dates
+from scripts.migration.backfill_daily_slate_videos import (
+    build_daily_backfill_summary,
+    filter_dates,
+)
 
 
 def test_filter_dates_keeps_only_requested_range():
