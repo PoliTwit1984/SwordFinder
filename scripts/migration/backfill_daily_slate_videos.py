@@ -4,7 +4,14 @@
 import argparse
 import asyncio
 import logging
+import sys
+from pathlib import Path
 from typing import Optional
+
+# This script lives in scripts/migration/ but imports from the repo-root `api`
+# module. Ensure the repo root is importable so the script remains runnable
+# standalone: `python scripts/migration/backfill_daily_slate_videos.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from api import (
     MIN_PUBLIC_SWORD_SCORE,
